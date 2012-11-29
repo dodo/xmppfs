@@ -48,6 +48,9 @@ function Directory(name, children) {
     Directory.super.call(this, name);
     this.children = children || {};
     this.stats.size = 4096;
+    Object.keys(this.children).forEach(function (k) {
+        this.children[k].parent = this;
+    }.bind(this));
 }
 
 Directory.prototype.open = function (flags, callback) {
@@ -164,6 +167,7 @@ root.mkdir = function (name, mode, callback) {
         state:    new State("state"),
     });
     node.jid = jid;
+    node.parent = this;
     this.children[name] = node;
     node.children.state.on('state', function (state) {
         if (state === "offline") {
