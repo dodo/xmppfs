@@ -186,6 +186,10 @@ root.mkdir = function (name, mode, callback) {
             console.log("client %s online.", node.jid.toString());
             node.children.resource.content = node.jid.resource;
         });
+        client.on('close', function () {
+            console.log("client %s offline.", node.jid.toString());
+            node.client = null;
+        });
     });
     callback(0);
 };
