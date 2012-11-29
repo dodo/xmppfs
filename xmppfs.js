@@ -9,7 +9,7 @@ var options = {
     mount:"/tmp/mnt/user@domain",
     jid:  "user@domain",
     dir:  "/tmp/mnt",
-    debug: true,
+//     debug: true,
 };
 
 function convertOpenFlags(openFlags) {
@@ -33,6 +33,8 @@ var std = {
 
         getattr: function (callback) {
             callback(0, {
+                uid:process.getuid(),
+                gid:process.getgid(),
                 size: 4096,
                 mode: 040444,
             });
@@ -97,8 +99,13 @@ var std = {
         getattr: function (callback) {
             var len = this.content && this.content.length;
             callback(0, {
+                uid:process.getuid(),
+                gid:process.getgid(),
                 size: len || 0,
                 mode: 0100666,
+                mtime: this.time.modify,
+                ctime: this.time.change,
+                atime: this.time.access,
             });
         },
 
@@ -117,9 +124,11 @@ var std = {
     },
 
     createFile: function (name, handlers, content) {
+        var now = new Date();
         return extend({
             name:     name,
             content: content,
+            time: {access:now, modify:now, change:now},
         }, std.file, handlers);
     },
 
