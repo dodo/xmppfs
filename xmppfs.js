@@ -9,8 +9,20 @@ var options = {
     mount:"/tmp/mnt/user@domain",
     jid:  "user@domain",
     dir:  "/tmp/mnt",
-    debug: false,
+//     debug: true,
 };
+
+function convertOpenFlags(openFlags) {
+  switch (openFlags & 3) {
+  case 0:
+    return 'r';              // O_RDONLY
+  case 1:
+    return 'w';              // O_WRONLY
+  case 2:
+    return 'r+';             // O_RDWR
+  }
+}
+
 
 
 var std = {
@@ -18,47 +30,95 @@ var std = {
         open: function (flags, callback) {
             callback(0);
         },
+
         getattr: function (callback) {
             callback(0, {
                 size: 4096,
                 mode: 040444,
-
             });
         },
+
         readdir: function (callback) {
             callback(0, Object.keys(this.children || {}));
         },
+
     },
+
     file: {
         open: function (flags, callback) {
+            console.log(this.name, convertOpenFlags(flags))
             callback(0);
         },
+
+        read: function (offset, len, buf, fd, callback) {
+            var maxBytes, data, err = 0;
+            if (this.content && offset < this.content.length) {
+                maxBytes = this.content.length - offset;
+                if (len > maxBytes) {
+                    len = maxBytes;
+                }
+                data = this.content.substring(offset, len);
+                buf.write(data, 0, len, 'utf8');
+                err = len;
+            }
+            callback(err);
+        },
+
+        write: function (offset, len, buf, fd, callback) {
+            var beginning, ending = "", blank = "", numBlankChars, err = 0;
+            var data = buf.toString('utf8'); // read the new data
+            this.content = this.content || "";
+            if (offset < this.content.length) {
+                beginning = this.content.substring(0, offset);
+                if (offset + data.length < this.content.length) {
+                    ending = this.content.substring(offset + data.length, this.content.length);
+                }
+            } else {
+                beginning = this.content;
+                numBlankChars = offset - this.content.length;
+                while (numBlankChars--) blank += " ";
+            }
+            this.content = beginning + blank + data + ending;
+            err = data.length;
+            callback(err);
+        },
+
         getattr: function (callback) {
+            var len = this.content && this.content.length;
             callback(0, {
-                size: this.content && this.content.length ? this.content.length : 0,
-                mode: 010444,
+                size: len || 0,
+                mode: 0100666,
             });
         },
 
+        readdir: function (callback) {
+            callback(-22); // EINVAL
+        },
+
     },
+
     // helper
+
     path: function (node) {
         var path = node.name;
         while ((node = node.parent)) path = Path.join(node.name, path);
         return path;
     },
+
     createFile: function (name, handlers, content) {
         return extend({
             name:     name,
             content: content,
         }, std.file, handlers);
     },
+
     createDirectory: function (name, handlers, children) {
         return extend({
             name:     name,
             children: children || {},
         }, std.dir, handlers);
     },
+
 };
 
 var root = std.createDirectory("", {
@@ -66,8 +126,9 @@ var root = std.createDirectory("", {
         var jid = new xmpp.JID(name);
         console.log("create new jid " + jid);
         var node = std.createDirectory(name, undefined, {
-            password: std.createFile("password"),
+            password: std.createFile("password", null, "secret"),
             resource: std.createFile("resource"),
+            messages: std.createFile("messages"),
         });
         node.jid = jid;
         this.children[name] = node;
@@ -94,7 +155,7 @@ function lookup(path) {
 
 function delegate(event, path, args) {
     var node = lookup(path);
-//     console.log("NODE", event, node)
+    console.log("NODE", event, path, node && node.name)
     if (node && node[event])
         return node[event].apply(node, args);
     else args[args.length - 1](-2);
@@ -123,10 +184,8 @@ var handlers = {
     },
 
     create: function (path, mode, callback) {
-        var err = 0; // assume success
-        callback(err);
+        delegate("create", Path.dirname(path), [Path.basename(path), mode, callback]);
     },
-
 
     readlink: function (path, callback) {
         delegate("readlink", path, [callback]);
