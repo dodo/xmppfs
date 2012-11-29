@@ -9,6 +9,8 @@ var trim = require('trim');
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
+var mode = require('./mode');
+
 var options = {
     mount:"/tmp/mnt/user@domain",
     jid:  "user@domain",
@@ -58,7 +60,7 @@ Directory.prototype.open = function (flags, callback) {
 };
 
 Directory.prototype.getattr = function (callback) {
-    callback(0, extend({mode:040444}, this.stats));
+    callback(0, extend({mode:mode("dr--r--r--")}, this.stats));
 };
 
 Directory.prototype.readdir = function (callback) {
@@ -83,7 +85,7 @@ File.prototype.open = function (flags, callback) {
 
 File.prototype.getattr = function (callback) {
     var len = this.content && this.content.length || 0;
-    callback(0, extend({mode:0100666, size:len}, this.stats));
+    callback(0, extend({mode:mode("-rw-rw-rw-"), size:len}, this.stats));
 };
 
 File.prototype.read = function (offset, len, buf, fd, callback) {
