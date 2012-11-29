@@ -8,6 +8,7 @@
   },
   "dependencies": {
       "extend": "*",
+      "inherits": "*",
       "node-xmpp":"*",
       "fuse4js":  "*"
   },

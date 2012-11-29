@@ -1,7 +1,9 @@
 var fs = require('fs');
 var Path = require('path');
 
+var inherits = require('inherits');
 var extend = require('extend');
+
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
@@ -24,137 +26,117 @@ function convertOpenFlags(openFlags) {
 }
 
 
+function Node(name) {
+    var now = new Date();
+    this.name = name;
+    this.stats = {
+        uid:process.getuid(),
+        gid:process.getgid(),
+        mtime:now,
+        atime:now,
+        ctime:now,
+    };
+}
 
-var std = {
-    dir: {
-        open: function (flags, callback) {
-            callback(0);
-        },
 
-        getattr: function (callback) {
-            callback(0, {
-                uid:process.getuid(),
-                gid:process.getgid(),
-                size: 4096,
-                mode: 040444,
-            });
-        },
+inherits(Directory, Node);
+function Directory(name, children) {
+    Directory.super.call(this, name);
+    this.children = children || {};
+    this.stats.size = 4096;
+}
 
-        readdir: function (callback) {
-            callback(0, Object.keys(this.children || {}));
-        },
-
-    },
-
-    file: {
-        open: function (flags, callback) {
-            console.log(this.name, convertOpenFlags(flags))
-            callback(0);
-        },
-
-        read: function (offset, len, buf, fd, callback) {
-            var maxBytes, data, err = 0;
-            if (this.content && offset < this.content.length) {
-                maxBytes = this.content.length - offset;
-                if (len > maxBytes) {
-                    len = maxBytes;
-                }
-                data = this.content.substring(offset, len);
-                buf.write(data, 0, len, 'utf8');
-                err = len;
-            }
-            callback(err);
-        },
-
-        write: function (offset, len, buf, fd, callback) {
-            var beginning, ending = "", blank = "", numBlankChars, err = 0;
-            var data = buf.toString('utf8'); // read the new data
-            this.content = this.content || "";
-            if (offset < this.content.length) {
-                beginning = this.content.substring(0, offset);
-                if (offset + data.length < this.content.length) {
-                    ending = this.content.substring(offset + data.length, this.content.length);
-                }
-            } else {
-                beginning = this.content;
-                numBlankChars = offset - this.content.length;
-                while (numBlankChars--) blank += " ";
-            }
-            this.content = beginning + blank + data + ending;
-            err = data.length;
-            callback(err);
-        },
-
-        truncate: function (offset, callback) {
-            this.content = this.content || "";
-            if (offset < this.content.length) {
-                this.content = this.content.substring(0, offset);
-            } else {
-                var numBlankChars = offset - this.content.length;
-                while (numBlankChars--) this.content += " ";
-            }
-            callback(0);
-        },
-
-        getattr: function (callback) {
-            var len = this.content && this.content.length;
-            callback(0, {
-                uid:process.getuid(),
-                gid:process.getgid(),
-                size: len || 0,
-                mode: 0100666,
-                mtime: this.time.modify,
-                ctime: this.time.change,
-                atime: this.time.access,
-            });
-        },
-
-        readdir: function (callback) {
-            callback(-22); // EINVAL
-        },
-
-    },
-
-    // helper
-
-    path: function (node) {
-        var path = node.name;
-        while ((node = node.parent)) path = Path.join(node.name, path);
-        return path;
-    },
-
-    createFile: function (name, handlers, content) {
-        var now = new Date();
-        return extend({
-            name:     name,
-            content: content,
-            time: {access:now, modify:now, change:now},
-        }, std.file, handlers);
-    },
-
-    createDirectory: function (name, handlers, children) {
-        return extend({
-            name:     name,
-            children: children || {},
-        }, std.dir, handlers);
-    },
-
+Directory.prototype.open = function (flags, callback) {
+    callback(0);
 };
 
-var root = std.createDirectory("", {
-    mkdir: function (name, mode, callback) {
-        var jid = new xmpp.JID(name);
-        console.log("create new jid " + jid);
-        var node = std.createDirectory(name, undefined, {
-            password: std.createFile("password", null, "secret"),
-            resource: std.createFile("resource"),
-            messages: std.createFile("messages"),
-        });
-        node.jid = jid;
-        this.children[name] = node;
-        callback(0);
-    },
-});
+Directory.prototype.getattr = function (callback) {
+    callback(0, extend({mode:040444}, this.stats));
+};
+
+Directory.prototype.readdir = function (callback) {
+    callback(0, Object.keys(this.children || {}));
+};
+
+
+inherits(File, Node);
+function File(name, content) {
+    File.super.call(this, name);
+    this.content = content;
+}
+
+File.prototype.readdir = function (callback) {
+    callback(-22);
+};
+
+File.prototype.open = function (flags, callback) {
+    console.log(this.name, convertOpenFlags(flags))
+    callback(0);
+};
+
+File.prototype.getattr = function (callback) {
+    var len = this.content && this.content.length || 0;
+    callback(0, extend({mode:0100666, size:len}, this.stats));
+};
+
+File.prototype.read = function (offset, len, buf, fd, callback) {
+    var maxBytes, data, err = 0;
+    if (this.content && offset < this.content.length) {
+        maxBytes = this.content.length - offset;
+        if (len > maxBytes) {
+            len = maxBytes;
+        }
+        data = this.content.substring(offset, len);
+        buf.write(data, 0, len, 'utf8');
+        err = len;
+    }
+    callback(err);
+};
+
+File.prototype.write = function (offset, len, buf, fd, callback) {
+    var beginning, ending = "", blank = "", numBlankChars, err = 0;
+    var data = buf.toString('utf8'); // read the new data
+    this.content = this.content || "";
+    if (offset < this.content.length) {
+        beginning = this.content.substring(0, offset);
+        if (offset + data.length < this.content.length) {
+            ending = this.content.substring(offset + data.length, this.content.length);
+        }
+    } else {
+        beginning = this.content;
+        numBlankChars = offset - this.content.length;
+        while (numBlankChars--) blank += " ";
+    }
+    this.content = beginning + blank + data + ending;
+    err = data.length;
+    callback(err);
+};
+
+File.prototype.truncate = function (offset, callback) {
+    this.content = this.content || "";
+    if (offset < this.content.length) {
+        this.content = this.content.substring(0, offset);
+    } else {
+        var numBlankChars = offset - this.content.length;
+        while (numBlankChars--) this.content += " ";
+    }
+    callback(0);
+};
+
+
+var root = new Directory("");
+root.mkdir = function (name, mode, callback) {
+    var jid = new xmpp.JID(name);
+    console.log("create new jid " + jid);
+    var node = new Directory(name, {
+        password: new File("password", "secret"),
+        resource: new File("resource"),
+        messages: new File("messages"),
+    });
+    node.jid = jid;
+    this.children[name] = node;
+    callback(0);
+};
 
 // -----------------------------------------------------------------------------
 
