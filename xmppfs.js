@@ -9,7 +9,7 @@ var options = {
     mount:"/tmp/mnt/user@domain",
     jid:  "user@domain",
     dir:  "/tmp/mnt",
-//     debug: true,
+    debug: true,
 };
 
 function convertOpenFlags(openFlags) {
@@ -81,6 +81,17 @@ var std = {
             this.content = beginning + blank + data + ending;
             err = data.length;
             callback(err);
+        },
+
+        truncate: function (offset, callback) {
+            this.content = this.content || "";
+            if (offset < this.content.length) {
+                this.content = this.content.substring(0, offset);
+            } else {
+                var numBlankChars = offset - this.content.length;
+                while (numBlankChars--) this.content += " ";
+            }
+            callback(0);
         },
 
         getattr: function (callback) {
@@ -155,7 +166,7 @@ function lookup(path) {
 
 function delegate(event, path, args) {
     var node = lookup(path);
-    console.log("NODE", event, path, node && node.name)
+//     console.log("NODE", event, path, node && node.name)
     if (node && node[event])
         return node[event].apply(node, args);
     else args[args.length - 1](-2);
@@ -185,6 +196,9 @@ var handlers = {
 
     create: function (path, mode, callback) {
         delegate("create", Path.dirname(path), [Path.basename(path), mode, callback]);
+    },
+    truncate: function (path, offset, callback) {
+        delegate("truncate", path, [offset, callback]);
     },
 
     readlink: function (path, callback) {
