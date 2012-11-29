@@ -134,12 +134,16 @@ function State(name, defaultvalue) {
 }
 
 State.prototype.write = function (offset, len, buf, fd, callback) {
+    var old_state = ""+this.content;
     var _write_file = State.super.prototype.write;
     return _write_file.call(this, offset, len, buf, fd, function (err) {
         this.content = trim(this.content);
-        if (this.content != "offline" && this.content != "online")
+        if (this.content != "offline" && this.content != "online") {
+            this.content = old_state;
             err = -129; // EKEYREJECTED
-        else this.emit('state', this.content);
+        } else {
+            this.emit('state', this.content);
+        }
         callback(err);
     }.bind(this));
 };
