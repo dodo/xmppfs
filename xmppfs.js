@@ -1,8 +1,10 @@
 var fs = require('fs');
 var Path = require('path');
+var EventEmitter = require('events').EventEmitter;
 
 var inherits = require('inherits');
 var extend = require('extend');
+var trim = require('trim');
 
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
@@ -26,7 +28,9 @@ function convertOpenFlags(openFlags) {
 }
 
 
+inherits(Node, EventEmitter);
 function Node(name) {
+    Node.super.call(this);
     var now = new Date();
     this.name = name;
     this.stats = {
@@ -124,6 +128,23 @@ File.prototype.truncate = function (offset, callback) {
 };
 
 
+inherits(State, File);
+function State(name, defaultvalue) {
+    State.super.call(this, name, defaultvalue || "offline");
+}
+
+State.prototype.write = function (offset, len, buf, fd, callback) {
+    var _write_file = State.super.prototype.write;
+    return _write_file.call(this, offset, len, buf, fd, function (err) {
+        this.content = trim(this.content);
+        if (this.content != "offline" && this.content != "online")
+            err = -129; // EKEYREJECTED
+        else this.emit('state', this.content);
+        callback(err);
+    }.bind(this));
+};
+
+
 var root = new Directory("");
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
@@ -132,9 +153,11 @@ root.mkdir = function (name, mode, callback) {
         password: new File("password", "secret"),
         resource: new File("resource"),
         messages: new File("messages"),
+        state:    new State("state"),
     });
     node.jid = jid;
     this.children[name] = node;
+    node.children.state.on('state', function (state) {console.error("STATE", state)});
     callback(0);
 };
 
@@ -157,7 +180,7 @@ function lookup(path) {
 
 function delegate(event, path, args) {
     var node = lookup(path);
-//     console.log("NODE", event, path, node && node.name)
+//     console.log("NODE", event, path, node && node.name, args);
     if (node && node[event])
         return node[event].apply(node, args);
     else args[args.length - 1](-2);
@@ -210,12 +233,16 @@ var handlers = {
         delegate("mkdir", Path.dirname(path), [Path.basename(path), mode, callback]);
     },
 
-    rmdir: function (callback) {
+    rmdir: function (path, callback) {
         delegate("rmdir", path, [callback]);
     },
 
+    flush: function (path, fd, callback) {
+        callback(0, fd);
+    },
+
     release: function (path, fd, callback) {
-        callback(0);
+        callback(0, fd);
     },
 
     init: function (callback) {
