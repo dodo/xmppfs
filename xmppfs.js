@@ -133,6 +133,10 @@ function State(name, defaultvalue) {
     State.super.call(this, name, defaultvalue || "offline");
 }
 
+State.prototype.truncate = function (offset, callback) {
+    callback(0); // do not truncate state. never.
+};
+
 State.prototype.write = function (offset, len, buf, fd, callback) {
     var old_state = ""+this.content;
     var _write_file = State.super.prototype.write;
