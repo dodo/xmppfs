@@ -165,7 +165,24 @@ root.mkdir = function (name, mode, callback) {
     });
     node.jid = jid;
     this.children[name] = node;
-    node.children.state.on('state', function (state) {console.error("STATE", state)});
+    node.children.state.on('state', function (state) {
+        if (state === "offline") {
+            if (node.client) {
+                console.log("disconnect client %s …", node.jid.toString());
+                node.client.end();
+                delete node.client;
+            }
+            return;
+        }
+        if (node.client) return;
+        console.log("connect client %s …", node.jid.toString());
+        var client = node.client = new xmpp.Client({jid:node.jid,
+            password:node.children.password.content});
+        client.on('online', function  () {
+            console.log("client %s online.", node.jid.toString());
+            node.children.resource.content = node.jid.resource;
+        });
+    });
     callback(0);
 };
 
