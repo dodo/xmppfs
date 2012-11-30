@@ -10,6 +10,7 @@
       "trim": "*",
       "extend": "*",
       "inherits": "*",
+      "bufferstream": "*",
       "node-xmpp":"*",
       "fuse4js":  "*"
   },

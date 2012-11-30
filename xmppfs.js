@@ -6,6 +6,7 @@ var inherits = require('inherits');
 var extend = require('extend');
 var trim = require('trim');
 
+var BufferStream = require('bufferstream');
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
@@ -58,6 +59,10 @@ Directory.prototype.open = function (flags, callback) {
     callback(0);
 };
 
+Directory.prototype.read = function (offset, len, buf, fd, callback) {
+    callback(-21); // EISDIR
+};
+
 Directory.prototype.getattr = function (callback) {
     callback(0, extend({mode:mode("dr--r--r--")}, this.stats));
 };
@@ -70,12 +75,9 @@ Directory.prototype.readdir = function (callback) {
 inherits(File, Node);
 function File(name, content) {
     File.super.call(this, name);
-    this.content = content;
+    this.content = new BufferStream({size:'flexible'});
+    if (content) this.content.write(content);
 }
-
-File.prototype.readdir = function (callback) {
-    callback(-22);
-};
 
 File.prototype.open = function (flags, callback) {
     console.log(this.name, convertOpenFlags(flags))
@@ -83,111 +85,59 @@ File.prototype.open = function (flags, callback) {
 };
 
 File.prototype.getattr = function (callback) {
-    var len = this.content && this.content.length || 0;
-    callback(0, extend({mode:mode("-rw-rw-rw-"), size:len}, this.stats));
+    callback(0, extend({
+        mode:mode("-rw-rw-rw-"),
+        size:this.content.length,
+    }, this.stats));
 };
 
 File.prototype.read = function (offset, len, buf, fd, callback) {
-    var maxBytes, data, err = 0;
-    if (this.content && offset < this.content.length) {
-        maxBytes = this.content.length - offset;
-        if (len > maxBytes) {
-            len = maxBytes;
-        }
-        data = this.content.substring(offset, len);
-        buf.write(data, 0, len, 'utf8');
-        err = len;
+    var err = 0;
+    var clen = this.content.length;
+    if (offset < clen) {
+        err = Math.min(len, clen - offset);
+        this.content.buffer.copy(buf.slice(0, err), 0, offset, Math.min(clen, offset + err));
     }
     callback(err);
 };
 
 File.prototype.write = function (offset, len, buf, fd, callback) {
-    var beginning, ending = "", blank = "", numBlankChars, err = 0;
-    var data = buf.toString('utf8'); // read the new data
-    this.content = this.content || "";
-    if (offset < this.content.length) {
-        beginning = this.content.substring(0, offset);
-        if (offset + data.length < this.content.length) {
-            ending = this.content.substring(offset + data.length, this.content.length);
-        }
-    } else {
-        beginning = this.content;
-        numBlankChars = offset - this.content.length;
-        while (numBlankChars--) blank += " ";
-    }
-    this.content = beginning + blank + data + ending;
-    err = data.length;
-    callback(err);
+    this.content.write(buf.slice(0, len));
+    callback(len);
 };
 
 File.prototype.truncate = function (offset, callback) {
-    this.content = this.content || "";
-    if (offset < this.content.length) {
-        this.content = this.content.substring(0, offset);
-    } else {
-        var numBlankChars = offset - this.content.length;
-        while (numBlankChars--) this.content += " ";
-    }
+    this.content.reset();
     callback(0);
 };
 
 
-inherits(State, File);
+inherits(State, Node);
 function State(name, defaultvalue) {
-    State.super.call(this, name, defaultvalue || "offline");
+    State.super.call(this, name);
+    this.content = defaultvalue || "offline";
 }
-
+State.prototype.open     = File.prototype.open;
+State.prototype.getattr  = File.prototype.getattr;
 State.prototype.truncate = function (offset, callback) {
     callback(0); // do not truncate state. never.
 };
 
+State.prototype.read  = function (offset, len, buf, fd, callback) {
+    callback(buf.write(this.content, 0, this.content.length));
+};
+
 State.prototype.write = function (offset, len, buf, fd, callback) {
-    var old_state = ""+this.content;
-    var _write_file = State.super.prototype.write;
-    return _write_file.call(this, offset, len, buf, fd, function (err) {
-        this.content = trim(this.content);
-        if (this.content != "offline" && this.content != "online") {
-            this.content = old_state;
-            err = -129; // EKEYREJECTED
-        } else {
-            this.emit('state', this.content);
-        }
-        callback(err);
-    }.bind(this));
-};
-
-
-inherits(Socket, Node);
-function Socket(name) {
-    Socket.super.call(this, name);
-}
-
-Socket.prototype.readdir = function (callback) {
-    callback(-22);
-};
-
-Socket.prototype.getattr = function (callback) {
-    var len = this.content && this.content.length || 0;
-    callback(0, extend({mode:mode("-rw-rw-rw-"), size:len}, this.stats));
-};
-
-Socket.prototype.open = function (flags, callback) {
-    console.error(this.name, convertOpenFlags(flags))
-    callback(0);
-};
-
-Socket.prototype.truncate = function (offset, callback) {
-    callback(0); // do not truncate socket. never.
-};
-
-Socket.prototype.write = function (offset, len, buf, fd, callback) {
-    console.error("WRITE")
-    callback(0, fd)
-};
-
-Socket.prototype.read = function (offset, len, buf, fd, callback) {
-    console.error("READ")
-    callback(0, fd)
+    var err = 0;
+    var data = trim(buf.toString('utf8')); // read the new data
+    if (data != "offline" && data != "online") {
+        err = -129; // EKEYREJECTED
+    } else {
+        err = len;
+        this.content = data;
+        this.emit('state', data);
+    }
+    callback(err);
 };
 
 // -----------------------------------------------------------------------------
@@ -200,7 +150,6 @@ root.mkdir = function (name, mode, callback) {
         password: new File("password", "secret"),
         resource: new File("resource"),
         messages: new File("messages"),
-        stanza:   new Socket("stanza"),
         state:    new State("state"),
     });
     node.jid = jid;
@@ -218,15 +167,17 @@ root.mkdir = function (name, mode, callback) {
         if (node.client) return;
         console.log("connect client %s …", node.jid.toString());
         var client = node.client = new xmpp.Client({jid:node.jid,
-            password:node.children.password.content});
+            password:node.children.password.content.toString('utf8')});
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
-            node.children.resource.content = node.jid.resource;
+            node.children.resource.content.reset();
+            node.children.resource.content.write(node.jid.resource || "");
         });
         client.on('close', function () {
             console.log("client %s offline.", node.jid.toString());
             node.client = null;
         });
+
     });
     callback(0);
 };
@@ -263,7 +214,7 @@ var handlers = {
     },
 
     readdir: function (path, callback) {
-        delegate("readdir", path, [callback]);
+        delegate("readdir", path, [callback], -20); // ENOTDIR
     },
 
     open: function (path, flags, callback) {
