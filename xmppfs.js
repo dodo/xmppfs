@@ -13,7 +13,6 @@ var mode = require('./mode');
 
 var options = {
     mount:"/tmp/mnt/user@domain",
-    jid:  "user@domain",
     dir:  "/tmp/mnt",
 //     debug: true,
 };
@@ -343,8 +342,7 @@ function main() {
         console.log("Usage: %s mount jid", Path.basename(process.argv[1]));
         return process.exit(-1);
     }
-    if (process.argv.length > 3)  options.dir = process.argv[2];
-    if (process.argv.length > 4)  options.jid = process.argv[3];
+    if (process.argv.length > 2)  options.dir = process.argv[2];
     options.mount = Path.normalize(options.dir);
 
     process.on('SIGINT', function() {
