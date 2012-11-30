@@ -158,6 +158,41 @@ State.prototype.write = function (offset, len, buf, fd, callback) {
 };
 
 
+inherits(Socket, Node);
+function Socket(name) {
+    Socket.super.call(this, name);
+}
+
+Socket.prototype.readdir = function (callback) {
+    callback(-22);
+};
+
+Socket.prototype.getattr = function (callback) {
+    var len = this.content && this.content.length || 0;
+    callback(0, extend({mode:mode("crw-rw-rw-"), size:len}, this.stats));
+};
+
+Socket.prototype.open = function (flags, callback) {
+    console.error(this.name, convertOpenFlags(flags))
+    callback(0);
+};
+
+Socket.prototype.truncate = function (offset, callback) {
+    callback(0); // do not truncate socket. never.
+};
+
+Socket.prototype.write = function (offset, len, buf, fd, callback) {
+    console.error("WRITE")
+    callback(0, fd)
+};
+
+Socket.prototype.read = function (offset, len, buf, fd, callback) {
+    console.error("READ")
+    callback(0, fd)
+};
+
+// -----------------------------------------------------------------------------
+
 var root = new Directory("");
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
@@ -166,6 +201,7 @@ root.mkdir = function (name, mode, callback) {
         password: new File("password", "secret"),
         resource: new File("resource"),
         messages: new File("messages"),
+        stanza:   new Socket("stanza"),
         state:    new State("state"),
     });
     node.jid = jid;
