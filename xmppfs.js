@@ -169,7 +169,7 @@ Socket.prototype.readdir = function (callback) {
 
 Socket.prototype.getattr = function (callback) {
     var len = this.content && this.content.length || 0;
-    callback(0, extend({mode:mode("crw-rw-rw-"), size:len}, this.stats));
+    callback(0, extend({mode:mode("-rw-rw-rw-"), size:len}, this.stats));
 };
 
 Socket.prototype.open = function (flags, callback) {
@@ -249,12 +249,12 @@ function lookup(path) {
     return node;
 }
 
-function delegate(event, path, args) {
+function delegate(event, path, args, err) {
     var node = lookup(path);
 //     console.log("NODE", event, path, node && node.name, args);
     if (node && node[event])
         return node[event].apply(node, args);
-    else args[args.length - 1](-2);
+    else args[args.length - 1](typeof(err) === 'undefined' ? -2 : err);
 }
 
 
@@ -291,13 +291,11 @@ var handlers = {
     },
 
     unlink: function (path, callback) {
-        var err = -1; // -EPERM assume failure
-        callback(err);
+        delegate("unline", path, [callback], -1);
     },
 
     rename: function (src, dst, callback) {
-        var err = -2; // -ENOENT assume failure
-        callback(err);
+        delegate("rename", src, [src, dst, callback]);
     },
 
     mkdir: function (path, mode, callback) {
@@ -309,11 +307,11 @@ var handlers = {
     },
 
     flush: function (path, fd, callback) {
-        callback(0, fd);
+        delegate("flush", path, [fd, callback], 0);
     },
 
     release: function (path, fd, callback) {
-        callback(0, fd);
+        delegate("release", path, [fd, callback], 0);
     },
 
     init: function (callback) {
