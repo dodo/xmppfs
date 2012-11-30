@@ -7,15 +7,24 @@ var mask = {
   l:0120000, // Symbolic link.
   s:0140000, // Socket
 };
-module.exports = function mode(o) {
+module.exports = mode;
+function mode(o) {
     if (typeof(o) == 'string')
-        return mask[(o = String(o).toLowerCase().split("").reverse()).pop()] +
-        "ugo".split("").reduce(function (p,v,s) {
-            s = (2 - s) * 3;
-            return p + "xwr".split("").reduce(function (x,m,i) {
-                return x + ( m === o[s+i] ? (Math.pow(2, i) << s) : 0);
-            }, 0);
+         return mode.octal(o);
+    else return mode.symbolic(o);
+};
+
+mode.octal = function octal(o) {
+    return mask[(o = String(o).toLowerCase().split("").reverse()).pop()] +
+    "ugo".split("").reduce(function (p,v,s) {
+        s = (2 - s) * 3;
+        return p + "xwr".split("").reduce(function (x,m,i) {
+            return x + ( m === o[s+i] ? (Math.pow(2, i) << s) : 0);
         }, 0);
+    }, 0);
+};
+
+mode.symbolic = function symbolic(o) {
     return Object.keys(mask).map(function (t) {
         return mask[t]==(o&0170000)&&t||""}).join("") +
         "ogu".split("").map(function (v,s) {
@@ -24,4 +33,4 @@ module.exports = function mode(o) {
                 return (((o & shift) >> s) & Math.pow(2, i)) ? m : "-";
             }).reverse().join("");
         }).reverse().join("");
-}
+};
