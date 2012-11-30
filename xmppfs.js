@@ -80,7 +80,7 @@ function File(name, content) {
 }
 
 File.prototype.open = function (flags, callback) {
-    console.log(this.name, convertOpenFlags(flags))
+//     console.log(this.name, convertOpenFlags(flags))
     callback(0);
 };
 
@@ -172,10 +172,21 @@ root.mkdir = function (name, mode, callback) {
             console.log("client %s online.", node.jid.toString());
             node.children.resource.content.reset();
             node.children.resource.content.write(node.jid.resource || "");
+            client.send(new xmpp.Element('presence', { }).
+                c('show').t('chat').up().
+                c('status').t('dodo is using this for tests')
+            );
         });
         client.on('close', function () {
             console.log("client %s offline.", node.jid.toString());
             node.client = null;
+        });
+        client.on('stanza', function (stanza) {
+            if (stanza.is('message') && stanza.attr.type !== 'error') {
+                var message = stanza.getChild('body').getText();
+                node.children.messages.content.write(message);
+//                 console.error("receiv", msg)
+            }
         });
 
     });
