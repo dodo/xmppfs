@@ -143,6 +143,41 @@ State.prototype.write = function (offset, len, buf, fd, callback) {
 
 // -----------------------------------------------------------------------------
 
+function escapeResource(resource) {
+    return ("" + resource).replace("/", "_");
+}
+
+function openChat(node, from) {
+    var name = from.bare().toString();
+    var open = function (resource) {
+        var chat = new Directory(resource, {
+            messages: new File("messages"),
+            presence: new File("presence"),
+        });
+        chat.parent = jid;
+        jid.children[resource] = chat;
+        return chat;
+    }
+    var jid = new Directory(name);
+    node.children[name] = jid;
+    node.chats[name] = jid;
+    jid.parent = node;
+    jid.mkdir = function (resource, mode, callback) {
+        open(resource);
+        callback(0);
+    };
+    return open(escapeResource(from.resource));
+}
+
+function getChat(node, stanza) {
+    var chat, from = new xmpp.JID(stanza.attrs.from);
+    if (!(chat = node.chats[from.bare().toString()]))
+        chat = openChat(node, from);
+    else if (!(chat = chat.children[escapeResource(from.resource)]))
+        chat = openChat(node, from);
+    return chat;
+}
+
 var root = new Directory("");
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
@@ -150,14 +185,17 @@ root.mkdir = function (name, mode, callback) {
     var node = new Directory(jid.bare().toString(), {
         password: new File("password", "secret"),
         resource: new File("resource", jid.resource),
-        messages: new File("messages"),
-        presence: new File("presence"),
         state:    new State("state"),
         iqs:      new File("iq"),
     });
+    node.chats = {};
     node.jid = jid;
     node.parent = this;
     this.children[name] = node;
+    node.mkdir = function (from, mode, callback) {
+        getChat(node, {attrs:{from:from}});
+        callback(0);
+    };
     node.children.state.on('state', function (state) {
         if (state === "offline") {
             if (node.client) {
@@ -179,7 +217,7 @@ root.mkdir = function (name, mode, callback) {
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
             node.children.resource.content.reset();
-            node.children.resource.content.write(node.jid.resource || "");
+            node.children.resource.content.write("" + node.jid.resource);
             client.send(new xmpp.Element('presence', { }).
                 c('show').t('chat').up().
                 c('status').t('dodo is using this for tests')
@@ -190,12 +228,14 @@ root.mkdir = function (name, mode, callback) {
             node.client = null;
         });
         client.router.match("self::message", function (stanza) {
+            var chat = getChat(node, stanza);
             var message = stanza.getChildText('body');
             if (message)
-                node.children.messages.content.write(message + "\n");
+                chat.children.messages.content.write(message + "\n");
         });
         client.router.match("self::presence", function (stanza) {
-            node.children.presence.content.write(stanza.toString() + "\n");
+            var chat = getChat(node, stanza);
+            chat.children.presence.content.write(stanza.toString() + "\n");
         });
         client.router.match("self::iq", function (stanza) {
             node.children.iqs.content.write(stanza.toString() + "\n");
