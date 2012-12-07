@@ -328,6 +328,11 @@ var handlers = {
         delegate("open", path, [flags, callback]);
     },
 
+    poll: function (path, fd, callback) {
+        console.error("POLL", path)
+        delegate("poll", path, [fd, callback], 0);
+    },
+
     read: function (path, offset, len, buf, fd, callback) {
         delegate("read", path, [offset, len, buf, fd, callback]);
     },
