@@ -147,7 +147,7 @@ var root = new Directory("");
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
     console.log("create new jid " + jid);
-    var node = new Directory(name, {
+    var node = new Directory(jid.bare().toString(), {
         password: new File("password", "secret"),
         resource: new File("resource", jid.resource),
         messages: new File("messages"),
