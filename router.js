@@ -6,7 +6,8 @@ var ltxXPath = require('ltx-xpath').XPath;
 
 exports.Router = Router;
 inherits(Router, EventEmitter);
-function Router(timeout) {
+function Router(connection, timeout) {
+    this.connection = connection;
     this.timeout = timeout || 1000;
     this.xpath = new ltxXPath();
     this.onstanza = this.onstanza.bind(this);

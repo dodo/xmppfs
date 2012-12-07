@@ -8,6 +8,7 @@
   },
   "dependencies": {
       "trim": "*",
+      "moment": "*",
       "extend": "*",
       "inherits": "*",
       "bufferstream": "*",

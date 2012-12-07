@@ -4,6 +4,7 @@ var EventEmitter = require('events').EventEmitter;
 
 var inherits = require('inherits');
 var extend = require('extend');
+var moment = require('moment');
 var trim = require('trim');
 
 var BufferStream = require('bufferstream');
@@ -150,6 +151,10 @@ State.prototype.write = function (offset, len, buf, fd, callback) {
 
 // -----------------------------------------------------------------------------
 
+function formatDate(date) {
+    return "[" + moment(date).format("hh:mm:ss") + "]";
+}
+
 function escapeResource(resource) {
     return ("" + resource).replace("/", "_");
 }
@@ -164,6 +169,32 @@ function openChat(node, from) {
         chat.parent = jid;
         jid.children[resource] = chat;
         chat.children.presence.setMode("r--r--r--");
+        chat.children.messages._offset = 0;
+        chat.children.messages._new = "";
+        var old_read = chat.children.messages.read;
+        chat.children.messages.read = function (offset, len, buf, fd, callback) {
+            this._offset = this.content.length;
+            this._new = "";
+            return old_read.call(this, offset, len, buf, fd, callback);
+        };
+        chat.children.messages.write = function (offset, len, buf, fd, callback) {
+            if (!node.client) return callback(0);
+            var to = new xmpp.JID(name);
+            if (this._offset) {
+                this.content.write(buf.slice(0,this._offset).toString('utf8')
+                    + this._new + formatDate() + "< "
+                    + buf.slice(this._offset).toString('utf8')
+                    + "\n");
+            } else
+                this.content.write(this._new + formatDate() + "< " + buf.toString('utf8') + "\n");
+            to.setResource(resource === "undefined" ? undefined : resource);
+            node.client.send(new xmpp.Element('message', {to:to, type:'chat'})
+                .c('body').t(buf.slice(this._offset).toString('utf8'))
+            );
+            this._offset = 0;
+            this._new = "";
+            callback(len);
+        };
         return chat;
     }
     var jid = new Directory(name);
@@ -219,7 +250,7 @@ root.mkdir = function (name, mode, callback) {
         var client = node.client = new xmpp.Client({jid:node.jid,
             password:node.children.password.content.toString('utf8')});
         node.children.password.setMode("r--r--r--");
-        client.router = new Router();
+        client.router = new Router(client);
         client.router.on('error', console.error.bind(console));
         client.on('stanza', client.router.onstanza);
 
@@ -229,8 +260,8 @@ root.mkdir = function (name, mode, callback) {
             node.children.resource.setMode("r--r--r--");
             node.children.resource.content.write("" + node.jid.resource);
             client.send(new xmpp.Element('presence', { }).
-                c('show').t('chat').up().
-                c('status').t('dodo is using this for tests')
+                c('show').t("chat").up().
+                c('status').t("dodo is using this for tests")
             );
         });
         client.on('close', function () {
@@ -240,8 +271,11 @@ root.mkdir = function (name, mode, callback) {
         client.router.match("self::message", function (stanza) {
             var chat = getChat(node, stanza);
             var message = stanza.getChildText('body');
-            if (message)
-                chat.children.messages.content.write(message + "\n");
+            if (message) {
+                chat.children.messages.content.write(formatDate() + "> " + message + "\n");
+                chat.children.messages._new = chat.children.messages.content
+                    .buffer.slice(chat.children.messages._offset).toString('utf8');
+            }
         });
         client.router.match("self::presence", function (stanza) {
             var chat = getChat(node, stanza);
