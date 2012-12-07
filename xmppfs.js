@@ -149,7 +149,7 @@ root.mkdir = function (name, mode, callback) {
     console.log("create new jid " + jid);
     var node = new Directory(name, {
         password: new File("password", "secret"),
-        resource: new File("resource"),
+        resource: new File("resource", jid.resource),
         messages: new File("messages"),
         state:    new State("state"),
         iqs:      new File("iq"),
@@ -167,6 +167,7 @@ root.mkdir = function (name, mode, callback) {
             return;
         }
         if (node.client) return;
+        node.jid.setResource(node.children.resource.content.toString('utf8'));
         console.log("connect client %s …", node.jid.toString());
         var client = node.client = new xmpp.Client({jid:node.jid,
             password:node.children.password.content.toString('utf8')});
