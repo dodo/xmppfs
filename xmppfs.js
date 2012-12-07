@@ -151,6 +151,7 @@ root.mkdir = function (name, mode, callback) {
         password: new File("password", "secret"),
         resource: new File("resource", jid.resource),
         messages: new File("messages"),
+        presence: new File("presence"),
         state:    new State("state"),
         iqs:      new File("iq"),
     });
@@ -192,6 +193,9 @@ root.mkdir = function (name, mode, callback) {
             var message = stanza.getChildText('body');
             if (message)
                 node.children.messages.content.write(message + "\n");
+        });
+        client.router.match("self::presence", function (stanza) {
+            node.children.presence.content.write(stanza.toString() + "\n");
         });
         client.router.match("self::iq", function (stanza) {
             node.children.iqs.content.write(stanza.toString() + "\n");
