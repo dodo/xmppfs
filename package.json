@@ -14,7 +14,7 @@
       "bufferstream": "*",
       "ltx-xpath":"*",
       "node-xmpp":"*",
-      "fuse4js":  "*"
+      "fuse4js":  "http://github.com/dodo/fuse4js/archive/master.tar.gz"
   },
   "repository": "",
   "author": "",
