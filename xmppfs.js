@@ -11,6 +11,7 @@ var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
 var mode = require('./mode');
+var Router = require('./router').Router;
 
 var options = {
     mount:"/tmp/mnt/user@domain",
@@ -151,6 +152,7 @@ root.mkdir = function (name, mode, callback) {
         resource: new File("resource"),
         messages: new File("messages"),
         state:    new State("state"),
+        iqs:      new File("iq"),
     });
     node.jid = jid;
     node.parent = this;
@@ -168,6 +170,10 @@ root.mkdir = function (name, mode, callback) {
         console.log("connect client %s …", node.jid.toString());
         var client = node.client = new xmpp.Client({jid:node.jid,
             password:node.children.password.content.toString('utf8')});
+        client.router = new Router();
+        client.router.on('error', console.error.bind(console));
+        client.on('stanza', client.router.onstanza);
+
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
             node.children.resource.content.reset();
@@ -181,12 +187,13 @@ root.mkdir = function (name, mode, callback) {
             console.log("client %s offline.", node.jid.toString());
             node.client = null;
         });
-        client.on('stanza', function (stanza) {
-            if (stanza.is('message') && stanza.attr.type !== 'error') {
-                var message = stanza.getChild('body').getText();
-                node.children.messages.content.write(message);
-//                 console.error("receiv", msg)
-            }
+        client.router.match("self::message", function (stanza) {
+            var message = stanza.getChildText('body');
+            if (message)
+                node.children.messages.content.write(message + "\n");
+        });
+        client.router.match("self::iq", function (stanza) {
+            node.children.iqs.content.write(stanza.toString() + "\n");
         });
 
     });
