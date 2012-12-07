@@ -32,6 +32,7 @@ function convertOpenFlags(openFlags) {
 
 
 inherits(Node, EventEmitter);
+Node.prototype.prefix = "-";
 function Node(name) {
     Node.super.call(this);
     var now = new Date();
@@ -43,10 +44,16 @@ function Node(name) {
         atime:now,
         ctime:now,
     };
+    this.setMode("---------");
 }
+
+Node.prototype.setMode = function (newmode) {
+    this.stats.mode = mode(this.prefix + newmode);
+};
 
 
 inherits(Directory, Node);
+Directory.prototype.prefix = "d";
 function Directory(name, children) {
     Directory.super.call(this, name);
     this.children = children || {};
@@ -54,6 +61,7 @@ function Directory(name, children) {
     Object.keys(this.children).forEach(function (k) {
         this.children[k].parent = this;
     }.bind(this));
+    this.setMode("r--r--r--");
 }
 
 Directory.prototype.open = function (flags, callback) {
@@ -65,7 +73,7 @@ Directory.prototype.read = function (offset, len, buf, fd, callback) {
 };
 
 Directory.prototype.getattr = function (callback) {
-    callback(0, extend({mode:mode("dr--r--r--")}, this.stats));
+    callback(0, extend({}, this.stats));
 };
 
 Directory.prototype.readdir = function (callback) {
@@ -78,6 +86,7 @@ function File(name, content) {
     File.super.call(this, name);
     this.content = new BufferStream({size:'flexible'});
     if (content) this.content.write(content);
+    this.setMode("rw-rw-rw-");
 }
 
 File.prototype.open = function (flags, callback) {
@@ -86,10 +95,7 @@ File.prototype.open = function (flags, callback) {
 };
 
 File.prototype.getattr = function (callback) {
-    callback(0, extend({
-        mode:mode("-rw-rw-rw-"),
-        size:this.content.length,
-    }, this.stats));
+    callback(0, extend({size:this.content.length}, this.stats));
 };
 
 File.prototype.read = function (offset, len, buf, fd, callback) {
@@ -117,6 +123,7 @@ inherits(State, Node);
 function State(name, defaultvalue) {
     State.super.call(this, name);
     this.content = defaultvalue || "offline";
+    this.setMode("rw-rw-rw-");
 }
 State.prototype.open     = File.prototype.open;
 State.prototype.getattr  = File.prototype.getattr;
@@ -156,6 +163,7 @@ function openChat(node, from) {
         });
         chat.parent = jid;
         jid.children[resource] = chat;
+        chat.children.presence.setMode("r--r--r--");
         return chat;
     }
     var jid = new Directory(name);
@@ -210,6 +218,7 @@ root.mkdir = function (name, mode, callback) {
         console.log("connect client %s …", node.jid.toString());
         var client = node.client = new xmpp.Client({jid:node.jid,
             password:node.children.password.content.toString('utf8')});
+        node.children.password.setMode("r--r--r--");
         client.router = new Router();
         client.router.on('error', console.error.bind(console));
         client.on('stanza', client.router.onstanza);
@@ -217,6 +226,7 @@ root.mkdir = function (name, mode, callback) {
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
             node.children.resource.content.reset();
+            node.children.resource.setMode("r--r--r--");
             node.children.resource.content.write("" + node.jid.resource);
             client.send(new xmpp.Element('presence', { }).
                 c('show').t('chat').up().
