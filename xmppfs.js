@@ -163,6 +163,9 @@ function escapeResource(resource) {
 
 function openChat(node, from) {
     var name = from.bare().toString();
+    if (node.chats[name]) {
+        return node.chats[name].openChat(escapeResource(from.resource));
+    }
     var open = function (resource) {
         var chat = new Directory(resource, {
             messages: new File("messages"),
@@ -203,6 +206,7 @@ function openChat(node, from) {
     var jid = new Directory(name);
     node.children[name] = jid;
     node.chats[name] = jid;
+    jid.openChat = open;
     jid.parent = node;
     jid.mkdir = function (resource, mode, callback) {
         open(resource);
