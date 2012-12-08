@@ -162,105 +162,7 @@ root.mkdir = function (name, mode, callback) {
     callback(0);
 };
 
-// -----------------------------------------------------------------------------
 
-function lookup(path) {
-    if (path === "/")
-        return root;
-    var parts = path.split('/');
-    var depth = 0;
-    var name = parts[++depth];
-    var node = root.children[name];
-    while(node && (depth + 1 < parts.length)) {
-        name = parts[++depth];
-        if (!node.children) return;
-        node = node.children[name];
-    }
-    return node;
-}
-
-function delegate(event, path, args, err) {
-    var node = lookup(path);
-//     console.log("NODE", event, path, node && node.name, args);
-    if (node && node[event])
-        return node[event].apply(node, args);
-    else args[args.length - 1](typeof(err) === 'undefined' ? -2 : err);
-}
-
-
-var handlers = {
-    getattr: function (path, callback) {
-        delegate("getattr", path, [callback]);
-    },
-
-    readdir: function (path, callback) {
-        delegate("readdir", path, [callback], -20); // ENOTDIR
-    },
-
-    open: function (path, flags, callback) {
-        delegate("open", path, [flags, callback]);
-    },
-
-    poll: function (path, fd, callback) {
-        console.error("POLL", path)
-        delegate("poll", path, [fd, callback], 0);
-    },
-
-    read: function (path, offset, len, buf, fd, callback) {
-        delegate("read", path, [offset, len, buf, fd, callback]);
-    },
-
-    write: function (path, offset, len, buf, fd, callback) {
-        delegate("write", path, [offset, len, buf, fd, callback]);
-    },
-
-    create: function (path, mode, callback) {
-        delegate("create", Path.dirname(path), [Path.basename(path), mode, callback]);
-    },
-    truncate: function (path, offset, callback) {
-        delegate("truncate", path, [offset, callback]);
-    },
-
-    readlink: function (path, callback) {
-        delegate("readlink", path, [callback]);
-    },
-
-    unlink: function (path, callback) {
-        delegate("unline", path, [callback], -1);
-    },
-
-    rename: function (src, dst, callback) {
-        delegate("rename", src, [src, dst, callback]);
-    },
-
-    mkdir: function (path, mode, callback) {
-        delegate("mkdir", Path.dirname(path), [Path.basename(path), mode, callback]);
-    },
-
-    rmdir: function (path, callback) {
-        delegate("rmdir", path, [callback]);
-    },
-
-    flush: function (path, fd, callback) {
-        delegate("flush", path, [fd, callback], 0);
-    },
-
-    release: function (path, fd, callback) {
-        delegate("release", path, [fd, callback], 0);
-    },
-
-    init: function (callback) {
-        console.log("File system started at " + options.mount);
-        console.log("To stop it, type this in another shell: fusermount -u " + options.mount);
-        callback();
-    },
-
-    destroy: function (callback) {
-        console.log("File system stopped");
-        callback();
-    },
-
-};
 
 function unmount(callback) {
     console.log("unmount.");
@@ -286,7 +188,7 @@ function main() {
     });
 
     try {
-        f4js.start(options.mount, handlers, options.debug);
+        f4js.start(options.mount, fs.createRouter(root, options), options.debug);
     } catch (err) {
         console.log("Exception when starting file system: " + err);
     }
