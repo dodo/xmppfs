@@ -1,3 +1,4 @@
+var __slice = [].slice;
 var xmpp = require('node-xmpp');
 function ID(aPrefix) {
     return (aPrefix || '') + Date.now() + Math.random();
@@ -28,13 +29,13 @@ var proto = Disco.prototype;
 
 proto.addFeature = function (/* features… */) {
     this.features.splice.apply(this.features,
-        [this.features.length, 0].concat(arguments));
+        [this.features.length, 0].concat(__slice.call(arguments)));
     return this;
 };
 
 proto.addIdentity = function (/* identities */) {
     this.identities.splice.apply(this.identities,
-        [this.identities.length, 0].concat(arguments));
+        [this.identities.length, 0].concat(__slice.call(arguments)));
     return this;
 };
 
@@ -47,6 +48,7 @@ proto.info = function (to, callback) {
 };
 
 proto.get_info = function (stanza) {
+    this.router.emit('info', stanza);
     var query = new xmpp.Iq({
         to:stanza.attrs.from,
         id:stanza.attrs.id,
