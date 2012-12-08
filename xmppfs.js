@@ -87,6 +87,7 @@ function getChat(node, stanza) {
     return chat;
 }
 
+var connections = 0;
 var root = new fs.Directory("");
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
@@ -124,6 +125,9 @@ root.mkdir = function (name, mode, callback) {
         node.children.password.setMode("r--r--r--");
         client.router = new Router(client);
         client.router.on('error', console.error.bind(console));
+        var onclose = function () {client.end()};
+        process.on('close connection', onclose);
+        connections++;
         client.router.f = {};
         client.router.f.disco = new Disco(client.router);
         client.router.f.ping  = new Ping(client.router, client.router.f.disco);
@@ -145,7 +149,10 @@ root.mkdir = function (name, mode, callback) {
             node.children.resource.setMode("rw-rw-rw-");
             node.children.password.setMode("rw-rw-rw-");
             console.log("client %s offline.", node.jid.toString());
+            process.removeListener('close connection', onclose);
             node.client = null;
+            connections--;
+            process.emit('connection closed');
         });
         client.router.match("self::message", function (stanza) {
             var chat = getChat(node, stanza);
@@ -189,8 +196,14 @@ function main() {
     if (process.argv.length > 2)  options.dir = process.argv[2];
     options.mount = Path.normalize(options.dir);
 
+    var closing = false;
     process.on('SIGINT', function() {
-        unmount(function() { process.exit(0); });
+        closing = true;
+        process.emit('close connection'); // close all connections
+        if (!connections) process.emit('connection closed');
+    });
+    process.on('connection closed', function () {
+        if (!connections && closing) unmount(function() { process.exit(0); });
     });
 
     try {
