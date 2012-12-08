@@ -12,9 +12,9 @@ var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
 var mode = require('./mode');
-var Router = require('./router').Router;
-var Disco = require('./disco').Disco;
-var Ping = require('./ping').Ping;
+var Router = require('./feature/router').Router;
+var Disco = require('./feature/disco').Disco;
+var Ping = require('./feature/ping').Ping;
 
 var options = {
     mount:"/tmp/mnt/user@domain",
