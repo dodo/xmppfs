@@ -1,17 +1,9 @@
-var fs = require('fs');
 var Path = require('path');
-var EventEmitter = require('events').EventEmitter;
-
-var inherits = require('inherits');
-var extend = require('extend');
 var moment = require('moment');
-var trim = require('trim');
-
-var BufferStream = require('bufferstream');
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
-var mode = require('./mode');
+var fs = require('./fs');
 var Router = require('./feature/router').Router;
 var Disco = require('./feature/disco').Disco;
 var Ping = require('./feature/ping').Ping;
@@ -20,135 +12,6 @@ var options = {
     mount:"/tmp/mnt/user@domain",
     dir:  "/tmp/mnt",
 //     debug: true,
-};
-
-function convertOpenFlags(openFlags) {
-  switch (openFlags & 3) {
-  case 0:
-    return 'r';              // O_RDONLY
-  case 1:
-    return 'w';              // O_WRONLY
-  case 2:
-    return 'r+';             // O_RDWR
-  }
-}
-
-
-inherits(Node, EventEmitter);
-Node.prototype.prefix = "-";
-function Node(name) {
-    Node.super.call(this);
-    var now = new Date();
-    this.name = name;
-    this.stats = {
-        uid:process.getuid(),
-        gid:process.getgid(),
-        mtime:now,
-        atime:now,
-        ctime:now,
-    };
-    this.setMode("---------");
-}
-
-Node.prototype.setMode = function (newmode) {
-    this.stats.mode = mode(this.prefix + newmode);
-};
-
-
-inherits(Directory, Node);
-Directory.prototype.prefix = "d";
-function Directory(name, children) {
-    Directory.super.call(this, name);
-    this.children = children || {};
-    this.stats.size = 4096;
-    Object.keys(this.children).forEach(function (k) {
-        this.children[k].parent = this;
-    }.bind(this));
-    this.setMode("r--r--r--");
-}
-
-Directory.prototype.open = function (flags, callback) {
-    callback(0);
-};
-
-Directory.prototype.read = function (offset, len, buf, fd, callback) {
-    callback(-21); // EISDIR
-};
-
-Directory.prototype.getattr = function (callback) {
-    callback(0, extend({}, this.stats));
-};
-
-Directory.prototype.readdir = function (callback) {
-    callback(0, Object.keys(this.children || {}));
-};
-
-
-inherits(File, Node);
-function File(name, content) {
-    File.super.call(this, name);
-    this.content = new BufferStream({size:'flexible'});
-    if (content) this.content.write(content);
-    this.setMode("rw-rw-rw-");
-}
-
-File.prototype.open = function (flags, callback) {
-//     console.log(this.name, convertOpenFlags(flags))
-    callback(0);
-};
-
-File.prototype.getattr = function (callback) {
-    callback(0, extend({size:this.content.length}, this.stats));
-};
-
-File.prototype.read = function (offset, len, buf, fd, callback) {
-    var err = 0;
-    var clen = this.content.length;
-    if (offset < clen) {
-        err = Math.min(len, clen - offset);
-        this.content.buffer.copy(buf.slice(0, err), 0, offset, Math.min(clen, offset + err));
-    }
-    callback(err);
-};
-
-File.prototype.write = function (offset, len, buf, fd, callback) {
-    this.content.write(buf.slice(0, len));
-    callback(len);
-};
-
-File.prototype.truncate = function (offset, callback) {
-    this.content.reset();
-    callback(0);
-};
-
-
-inherits(State, Node);
-function State(name, defaultvalue) {
-    State.super.call(this, name);
-    this.content = defaultvalue || "offline";
-    this.setMode("rw-rw-rw-");
-}
-State.prototype.open     = File.prototype.open;
-State.prototype.getattr  = File.prototype.getattr;
-State.prototype.truncate = function (offset, callback) {
-    callback(0); // do not truncate state. never.
-};
-
-State.prototype.read  = function (offset, len, buf, fd, callback) {
-    callback(buf.write(this.content, 0, this.content.length));
-};
-
-State.prototype.write = function (offset, len, buf, fd, callback) {
-    var err = 0;
-    var data = trim(buf.toString('utf8')); // read the new data
-    if (data != "offline" && data != "online") {
-        err = -129; // EKEYREJECTED
-    } else {
-        err = len;
-        this.content = data;
-        this.emit('state', data);
-    }
-    callback(err);
 };
 
 // -----------------------------------------------------------------------------
@@ -167,9 +30,9 @@ function openChat(node, from) {
         return node.chats[name].openChat(escapeResource(from.resource));
     }
     var open = function (resource) {
-        var chat = new Directory(resource, {
-            messages: new File("messages"),
-            presence: new File("presence"),
+        var chat = new fs.Directory(resource, {
+            messages: new fs.File("messages"),
+            presence: new fs.File("presence"),
         });
         chat.parent = jid;
         jid.children[resource] = chat;
@@ -203,7 +66,7 @@ function openChat(node, from) {
         };
         return chat;
     }
-    var jid = new Directory(name);
+    var jid = new fs.Directory(name);
     node.children[name] = jid;
     node.chats[name] = jid;
     jid.openChat = open;
@@ -224,15 +87,15 @@ function getChat(node, stanza) {
     return chat;
 }
 
-var root = new Directory("");
+var root = new fs.Directory("");
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
     console.log("create new jid " + jid);
-    var node = new Directory(jid.bare().toString(), {
-        password: new File("password", "secret"),
-        resource: new File("resource", jid.resource),
-        state:    new State("state"),
-        iqs:      new File("iq"),
+    var node = new fs.Directory(jid.bare().toString(), {
+        password: new fs.File("password", "secret"),
+        resource: new fs.File("resource", jid.resource),
+        state:    new fs.State("state"),
+        iqs:      new fs.File("iq"),
     });
     node.chats = {};
     node.jid = jid;
