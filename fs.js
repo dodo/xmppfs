@@ -5,6 +5,7 @@ var inherits = require('inherits');
 var extend = require('extend');
 var trim = require('trim');
 var mode = require('./mode');
+var __slice = [].slice;
 
 
 exports.convertOpenFlags = convertOpenFlags;
@@ -162,84 +163,50 @@ function scheduler(event, path, args, err) {
     var node = lookup(this, path);
 //     console.log("NODE", event, path, node && node.name, args);
     if (node && node[event])
-        return node[event].apply(node, args);
-    else args[args.length - 1](typeof(err) === 'undefined' ? -2 : err);
+         return node[event].apply(node, args);
+    else return args.pop()(err);
 }
-
 
 exports.createRouter = createRouter;
 function createRouter(root, options) {
     var delegate = scheduler.bind(root);
-    return {
-    getattr: function (path, callback) {
-        delegate("getattr", path, [callback]);
-    },
+    function pass(method) {
+        var code = 0 + this;
+        return handlers[method] = function (path) {
+            delegate(method, path, __slice.call(arguments, 1), code);
+        };
+    }
 
-    readdir: function (path, callback) {
-        delegate("readdir", path, [callback], -20); // ENOTDIR
-    },
+    var handlers = {
 
-    open: function (path, flags, callback) {
-        delegate("open", path, [flags, callback]);
-    },
+        init: function (callback) {
+            console.log("File system started at " + options.mount);
+            console.log("To stop it, type this in another shell: fusermount -u " + options.mount);
+            callback();
+        },
 
-    poll: function (path, fd, callback) {
-        console.error("POLL", path)
-        delegate("poll", path, [fd, callback], 0);
-    },
+        destroy: function (callback) {
+            console.log("File system stopped");
+            callback();
+        },
 
-    read: function (path, offset, len, buf, fd, callback) {
-        delegate("read", path, [offset, len, buf, fd, callback]);
-    },
+    };
 
-    write: function (path, offset, len, buf, fd, callback) {
-        delegate("write", path, [offset, len, buf, fd, callback]);
-    },
+    pass.call(-20, "readdir");  // ENOTDIR
+    pass.call(-1 , "unlink");
 
-    create: function (path, mode, callback) {
-        delegate("create", Path.dirname(path), [Path.basename(path), mode, callback]);
-    },
-    truncate: function (path, offset, callback) {
-        delegate("truncate", path, [offset, callback]);
-    },
+    var passthrough = ["getattr","open","read","write","truncate","readlink","rename","rmdir"];
+    passthrough.map(pass.bind(-2));
+    var passsuccess = ["poll","flush","release"];
+    passsuccess.map(pass.bind(0));
+    var passpath = ["create","mkdir"];
+    passpath.map(function (method) {
+        handlers[method] = function (path) {
+            var args = __slice.call(arguments, 1);
+            args.unshift(Path.basename(path));
+            delegate(method, Path.dirname(path), args, -2);
+        };
+    });
 
-    readlink: function (path, callback) {
-        delegate("readlink", path, [callback]);
-    },
-
-    unlink: function (path, callback) {
-        delegate("unline", path, [callback], -1);
-    },
-
-    rename: function (src, dst, callback) {
-        delegate("rename", src, [src, dst, callback]);
-    },
-
-    mkdir: function (path, mode, callback) {
-        delegate("mkdir", Path.dirname(path), [Path.basename(path), mode, callback]);
-    },
-
-    rmdir: function (path, callback) {
-        delegate("rmdir", path, [callback]);
-    },
-
-    flush: function (path, fd, callback) {
-        delegate("flush", path, [fd, callback], 0);
-    },
-
-    release: function (path, fd, callback) {
-        delegate("release", path, [fd, callback], 0);
-    },
-
-    init: function (callback) {
-        console.log("File system started at " + options.mount);
-        console.log("To stop it, type this in another shell: fusermount -u " + options.mount);
-        callback();
-    },
-
-    destroy: function (callback) {
-        console.log("File system stopped");
-        callback();
-    },
-
-}};
+    return handlers;
+}
