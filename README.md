@@ -6,6 +6,7 @@ _use your standard shell to control your xmpp client!_
 #### install
 
 ```bash
+> sudo apt-get install libfuse-dev # debian
 > git clone git://github.com/dodo/xmppfs.git
 > cd xmppfs
 > npm install .
