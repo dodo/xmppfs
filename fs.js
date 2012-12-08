@@ -8,6 +8,9 @@ var mode = require('./mode');
 var __slice = [].slice;
 
 
+var E = exports.E = {OK:0,EPERM:1,ENOENT:2,ENOTDIR:20,EISDIR:21,EKEYREJECTED:129};
+
+
 exports.convertOpenFlags = convertOpenFlags;
 function convertOpenFlags(openFlags) {
   switch (openFlags & 3) {
@@ -57,19 +60,19 @@ function Directory(name, children) {
 }
 
 Directory.prototype.open = function (flags, callback) {
-    callback(0);
+    callback(E.OK);
 };
 
 Directory.prototype.read = function (offset, len, buf, fd, callback) {
-    callback(-21); // EISDIR
+    callback(-E.EISDIR);
 };
 
 Directory.prototype.getattr = function (callback) {
-    callback(0, extend({}, this.stats));
+    callback(E.OK, extend({}, this.stats));
 };
 
 Directory.prototype.readdir = function (callback) {
-    callback(0, Object.keys(this.children || {}));
+    callback(E.OK, Object.keys(this.children || {}));
 };
 
 
@@ -84,15 +87,15 @@ function File(name, content) {
 
 File.prototype.open = function (flags, callback) {
 //     console.log(this.name, convertOpenFlags(flags))
-    callback(0);
+    callback(E.OK);
 };
 
 File.prototype.getattr = function (callback) {
-    callback(0, extend({size:this.content.length}, this.stats));
+    callback(E.OK, extend({size:this.content.length}, this.stats));
 };
 
 File.prototype.read = function (offset, len, buf, fd, callback) {
-    var err = 0;
+    var err = E.OK;
     var clen = this.content.length;
     if (offset < clen) {
         err = Math.min(len, clen - offset);
@@ -108,7 +111,7 @@ File.prototype.write = function (offset, len, buf, fd, callback) {
 
 File.prototype.truncate = function (offset, callback) {
     this.content.reset();
-    callback(0);
+    callback(E.OK);
 };
 
 
@@ -122,7 +125,7 @@ function State(name, defaultvalue) {
 State.prototype.open     = File.prototype.open;
 State.prototype.getattr  = File.prototype.getattr;
 State.prototype.truncate = function (offset, callback) {
-    callback(0); // do not truncate state. never.
+    callback(E.OK); // do not truncate state. never.
 };
 
 State.prototype.read  = function (offset, len, buf, fd, callback) {
@@ -130,10 +133,10 @@ State.prototype.read  = function (offset, len, buf, fd, callback) {
 };
 
 State.prototype.write = function (offset, len, buf, fd, callback) {
-    var err = 0;
+    var err = E.OK;
     var data = trim(buf.toString('utf8')); // read the new data
     if (data != "offline" && data != "online") {
-        err = -129; // EKEYREJECTED
+        err = -E.EKEYREJECTED;
     } else {
         err = len;
         this.content = data;
@@ -192,19 +195,19 @@ function createRouter(root, options) {
 
     };
 
-    pass.call(-20, "readdir");  // ENOTDIR
-    pass.call(-1 , "unlink");
+    pass.call(-E.ENOTDIR, "readdir");
+    pass.call(-E.EPERM  , "unlink");
 
     var passthrough = ["getattr","open","read","write","truncate","readlink","rename","rmdir"];
-    passthrough.map(pass.bind(-2));
+    passthrough.map(pass.bind(-E.ENOENT));
     var passsuccess = ["poll","flush","release"];
-    passsuccess.map(pass.bind(0));
+    passsuccess.map(pass.bind(E.OK));
     var passpath = ["create","mkdir"];
     passpath.map(function (method) {
         handlers[method] = function (path) {
             var args = __slice.call(arguments, 1);
             args.unshift(Path.basename(path));
-            delegate(method, Path.dirname(path), args, -2);
+            delegate(method, Path.dirname(path), args, -E.ENOENT);
         };
     });
 

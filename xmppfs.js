@@ -46,7 +46,7 @@ function openChat(node, from) {
             return old_read.call(this, offset, len, buf, fd, callback);
         };
         chat.children.messages.write = function (offset, len, buf, fd, callback) {
-            if (!node.client) return callback(0);
+            if (!node.client) return callback(fs.E.OK);
             var to = new xmpp.JID(name);
             if (this._offset + this._new.length === offset)
                 this.content.write(this._new + formatDate() + "< " + buf.toString('utf8') + "\n");
@@ -73,7 +73,7 @@ function openChat(node, from) {
     jid.parent = node;
     jid.mkdir = function (resource, mode, callback) {
         open(resource);
-        callback(0);
+        callback(fs.E.OK);
     };
     return open(escapeResource(from.resource));
 }
@@ -103,7 +103,7 @@ root.mkdir = function (name, mode, callback) {
     this.children[name] = node;
     node.mkdir = function (from, mode, callback) {
         getChat(node, {attrs:{from:from}});
-        callback(0);
+        callback(fs.E.OK);
     };
     node.children.state.on('state', function (state) {
         if (state === "offline") {
@@ -159,7 +159,7 @@ root.mkdir = function (name, mode, callback) {
         });
 
     });
-    callback(0);
+    callback(fs.E.OK);
 };
 
 
