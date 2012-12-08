@@ -14,6 +14,7 @@ var f4js = require('fuse4js');
 var mode = require('./mode');
 var Router = require('./router').Router;
 var Disco = require('./disco').Disco;
+var Ping = require('./ping').Ping;
 
 var options = {
     mount:"/tmp/mnt/user@domain",
@@ -254,7 +255,9 @@ root.mkdir = function (name, mode, callback) {
         node.children.password.setMode("r--r--r--");
         client.router = new Router(client);
         client.router.on('error', console.error.bind(console));
-        client.router.disco = new Disco(client.router);
+        client.router.f = {};
+        client.router.f.disco = new Disco(client.router);
+        client.router.f.ping  = new Ping(client.router, client.router.f.disco);
         client.on('stanza', client.router.onstanza);
 
         client.on('online', function  () {
