@@ -141,6 +141,9 @@ root.mkdir = function (name, mode, callback) {
             );
         });
         client.on('close', function () {
+            node.children.roster.hidden = true;
+            node.children.resource.setMode("rw-rw-rw-");
+            node.children.password.setMode("rw-rw-rw-");
             console.log("client %s offline.", node.jid.toString());
             node.client = null;
         });
