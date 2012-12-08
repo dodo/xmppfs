@@ -32,7 +32,7 @@ _use your standard shell to control your xmpp client!_
 
 ```bash
 > mkdir /tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit
-> echo 'hello romeo' >> /tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit/undefined/messages
+> echo -n 'hello romeo' >> /tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit/undefined/messages
 ```
 
 #### read
