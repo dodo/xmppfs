@@ -92,6 +92,7 @@ root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
     console.log("create new jid " + jid);
     var node = new fs.Directory(jid.bare().toString(), {
+        roster:   new fs.Directory("roster"),
         password: new fs.File("password", "secret"),
         resource: new fs.File("resource", jid.resource),
         state:    new fs.State("state"),
@@ -105,6 +106,7 @@ root.mkdir = function (name, mode, callback) {
         getChat(node, {attrs:{from:from}});
         callback(fs.E.OK);
     };
+    node.children.roster.hidden = true;
     node.children.state.on('state', function (state) {
         if (state === "offline") {
             if (node.client) {
@@ -129,6 +131,7 @@ root.mkdir = function (name, mode, callback) {
 
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
+            node.children.roster.hidden = false;
             node.children.resource.content.reset();
             node.children.resource.setMode("r--r--r--");
             node.children.resource.content.write("" + node.jid.resource);

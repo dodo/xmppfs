@@ -31,6 +31,7 @@ function Node(name) {
     Node.super.call(this);
     var now = new Date();
     this.name = name;
+    this.hidden = false;
     this.stats = {
         uid:process.getuid(),
         gid:process.getgid(),
@@ -72,7 +73,10 @@ Directory.prototype.getattr = function (callback) {
 };
 
 Directory.prototype.readdir = function (callback) {
-    callback(E.OK, Object.keys(this.children || {}));
+    callback(E.OK, Object.keys(this.children).map(function (name) {
+        if (this.children[name].hidden) name = "." + name;
+        return name;
+    }.bind(this)));
 };
 
 
@@ -147,17 +151,27 @@ State.prototype.write = function (offset, len, buf, fd, callback) {
 
 // -----------------------------------------------------------------------------
 
+function decodeHidden(children, name) {
+    var node = children[name];
+    if (node) return node;
+    if (name.charCodeAt(0) === 46 /*.*/ &&
+       (node = children[name.slice(1)]) &&
+        node.hidden)
+        return node;
+    return;
+}
+
 function lookup(root, path) {
     if (path === "/")
         return root;
     var parts = path.split('/');
     var depth = 0;
     var name = parts[++depth];
-    var node = root.children[name];
+    var node = decodeHidden(root.children, name);
     while(node && (depth + 1 < parts.length)) {
         name = parts[++depth];
         if (!node.children) return;
-        node = node.children[name];
+        node = decodeHidden(node.children, name);
     }
     return node;
 }
