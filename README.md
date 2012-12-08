@@ -40,3 +40,5 @@ _use your standard shell to control your xmpp client!_
 ```bash
 > tail -f /tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit/barok/messages
 ```
+
+or just open `/tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit/barok/messages` in a text editor, type something into the last line and save file :)
