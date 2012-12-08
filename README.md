@@ -43,3 +43,11 @@ _use your standard shell to control your xmpp client!_
 ```
 
 or just open `/tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit/barok/messages` in a text editor, type something into the last line and save file :)
+
+#### clear history
+
+```bash
+> truncate /tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit/barok/messages
+> # or
+> echo -n 'now something completely different' > /tmp/xmpp/juliet@capulet.lit/romeo@capulet.lit/undefined/messages
+```
