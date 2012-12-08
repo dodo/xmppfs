@@ -180,16 +180,17 @@ function openChat(node, from) {
         chat.children.messages.write = function (offset, len, buf, fd, callback) {
             if (!node.client) return callback(0);
             var to = new xmpp.JID(name);
-            if (this._offset) {
+            if (this._offset + this._new.length === offset)
+                this.content.write(this._new + formatDate() + "< " + buf.toString('utf8') + "\n");
+            else {
                 this.content.write(buf.slice(0,this._offset).toString('utf8')
                     + this._new + formatDate() + "< "
                     + buf.slice(this._offset).toString('utf8')
                     + "\n");
-            } else
-                this.content.write(this._new + formatDate() + "< " + buf.toString('utf8') + "\n");
+            }
             to.setResource(resource === "undefined" ? undefined : resource);
             node.client.send(new xmpp.Element('message', {to:to, type:'chat'})
-                .c('body').t(buf.slice(this._offset).toString('utf8'))
+                .c('body').t(buf.slice(this._offset + this._new.length - offset).toString('utf8'))
             );
             this._offset = 0;
             this._new = "";
