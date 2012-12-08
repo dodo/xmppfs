@@ -1,7 +1,6 @@
 var xmpp = require('node-xmpp');
-function ID(aPrefix) {
-    return (aPrefix || '') + Date.now() + Math.random();
-};
+var util = require('./util');
+
 var NS = {
     ping: 'urn:xmpp:ping',
 };
@@ -16,7 +15,7 @@ Ping.NS = NS;
 var proto = Ping.prototype;
 
 proto.ping = function (to, callback) {
-    var id = ID("ping");
+    var id = util.id("ping");
     this.router.request("self::iq[@id='" + id + "']", callback);
     this.router.send(new xmpp.Iq({to:to,id:id,type:'get'})
         .c("ping", {xmlns:NS.ping}).up());

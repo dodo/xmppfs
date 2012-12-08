@@ -1,8 +1,6 @@
 var __slice = [].slice;
 var xmpp = require('node-xmpp');
-function ID(aPrefix) {
-    return (aPrefix || '') + Date.now() + Math.random();
-};
+var util = require('./util');
 
 var NS = {
     'disco#info': "http://jabber.org/protocol/disco#info",
@@ -40,7 +38,7 @@ proto.addIdentity = function (/* identities */) {
 };
 
 proto.info = function (to, callback) {
-    var id = ID("info");
+    var id = util.id("info");
     var xpath = "self::iq[@type=result and @id='" + id + "']/info:query";
     this.router.request(xpath, {info:NS['disco#info']}, callback);
     this.router.send(new xmpp.Iq({to:to,id:id})
