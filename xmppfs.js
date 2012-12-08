@@ -176,8 +176,9 @@ root.mkdir = function (name, mode, callback) {
 };
 
 
-
+var skipumount = true;
 function unmount(callback) {
+    if (skipumount) return callback();
     console.log("unmount.");
     var cmd = "fusermount -u " + options.mount;
     require('child_process').exec(cmd, function (err) {
@@ -197,10 +198,16 @@ function main() {
     options.mount = Path.normalize(options.dir);
 
     var closing = false;
-    process.on('SIGINT', function() {
+
+    options.destroy = function() {
+        if (closing) return;
         closing = true;
         process.emit('close connection'); // close all connections
         if (!connections) process.emit('connection closed');
+    };
+    process.on('SIGINT', function () {
+        skipumount = false;
+        options.destroy();
     });
     process.on('connection closed', function () {
         if (!connections && closing) unmount(function() { process.exit(0); });

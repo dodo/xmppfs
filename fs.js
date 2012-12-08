@@ -204,6 +204,7 @@ function createRouter(root, options) {
 
         destroy: function (callback) {
             console.log("File system stopped");
+            if (options.destroy) options.destroy();
             callback();
         },
 
