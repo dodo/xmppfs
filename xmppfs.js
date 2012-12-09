@@ -91,7 +91,8 @@ function getChat(node, stanza) {
 }
 
 var connections = 0;
-var root = new fs.Directory("");
+var root = new fs.Directory("", {photos:new fs.Directory("photos")});
+root.children.photos.hidden = true;
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
     console.log("create new jid " + jid);
@@ -232,21 +233,30 @@ root.mkdir = function (name, mode, callback) {
                     chat.children[name].content.write(text);
                 }
             });
-            var s; if ((s = stanza.getChild("x", VCard.NS.update)) && s.getChildText("photo")) {
+            var s, hash;
+            if ((s = stanza.getChild("x", VCard.NS.update)) &&
+                (hash = s.getChildText("photo"))) {
                 client.router.f.vcard.get(stanza.attrs.from, function (err, stanza, match) {
                     if (err) return console.error("fetch errored:", err);
                     for (var text, i = 0; i < match.length ; i++) {
                         if (match[i].name === "PHOTO" &&
                            (text = match[i].getChildText("BINVAL"))) {
                             var blob = new Buffer(text, 'base64');
-                            if (!chat.children.avatar) {
-                                var f = new fs.File("avatar", blob);
-                                chat.children.avatar = f;
+                            var ext = "";
+                            if ((ext = match[i].getChildText("TYPE")))
+                                ext = ext.replace("image/",".");
+                            else ext = "";
+                            var name = "avatar" + ext;
+                            if (!chat.parent.children[name]) {
+                                var f = new fs.File(name, blob);
+                                root.children.photos.children[hash] = f;
+                                chat.parent.children[".avatar"] = f;
+                                chat.parent.children[name] = f;
                                 f.setMode("r--r--r--");
-                                f.parent = chat;
+                                f.parent = chat.parent;
                             }
-                            chat.children.avatar.content.reset();
-                            chat.children.avatar.content.write(blob);
+                            chat.parent.children[".avatar"].content.reset();
+                            chat.parent.children[".avatar"].content.write(blob);
                             break;
                         }
                     }

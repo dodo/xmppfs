@@ -23,6 +23,9 @@ function convertOpenFlags(openFlags) {
   }
 }
 
+exports.join = join;
+function join(node) {return node ? (join(node.parent) + "/" + node.name) : ""};
+
 
 exports.Node = Node;
 inherits(Node, EventEmitter);
