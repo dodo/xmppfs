@@ -260,11 +260,16 @@ root.mkdir = function (name, mode, callback) {
                             chat.parent.children[".avatar"].content.write(blob);
 
                             var path = Path.join(options.mount, "photos", hash);
-                            text = "[Desktop Entry]\nIcon=" + path +  "\n";
+                            text = "[Desktop Entry]\n"
+                                + "Version=1.0\n"
+                                + "Type=Directory\n"
+                                + "Name=Contact\n"
+                                + "Comment=" + chat.parent.name + "\n"
+                                + "Icon=" + path +  "\n";
                             if (!chat.parent.children[".directory"]) {
                                 var f = new fs.File("directory", text);
                                 chat.parent.children[".directory"] = f;
-                                f.setMode("rw-r--r--");
+                                f.setMode("rwxr-xr-x");
                                 f.parent = chat.parent;
                                 f.write = function (offset, len, buf, fd, callback) {
                                     return callback(fs.E.OK);
