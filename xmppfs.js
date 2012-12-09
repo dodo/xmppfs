@@ -69,7 +69,16 @@ function openChat(node, from) {
         };
         return chat;
     }
-    var jid = new fs.Directory(name);
+    var jid = new fs.Directory(name, {
+        ".directory": new fs.File(".directory",
+            "[Desktop Entry]\n"
+            + "Version=1.0\n"
+            + "Type=Directory\n"
+            + "MimeType=inode/directory;\n"
+            + "Name=Contact\n"
+            + "Comment=" + name + "\n"
+            + "Icon=user-identity")
+    });
     node.children[name] = jid;
     node.chats[name] = jid;
     jid.openChat = open;
@@ -78,6 +87,10 @@ function openChat(node, from) {
     jid.mkdir = function (resource, mode, callback) {
         open(resource);
         callback(fs.E.OK);
+    };
+    jid.children[".directory"].setMode("rwxr-xr-x");
+    jid.children[".directory"].write = function (offset, len, buf, fd, callback) {
+        return callback(fs.E.OK);
     };
     return open(escapeResource(from.resource));
 }
@@ -98,7 +111,10 @@ root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
     console.log("create new jid " + jid);
     var node = new fs.Directory(jid.bare().toString(), {
-        roster:   new fs.Directory("roster"),
+        roster:   new fs.Directory("roster", {
+            ".directory": new fs.File(".directory", "[Desktop Entry]\n"
+                + "Icon=x-office-address-book")
+        }),
         password: new fs.File("password", "secret"),
         resource: new fs.File("resource", jid.resource),
         state:    new fs.State("state", ["online", "offline"], "offline"),
@@ -260,23 +276,15 @@ root.mkdir = function (name, mode, callback) {
                             chat.parent.children[".avatar"].content.write(blob);
 
                             var path = Path.join(options.mount, "photos", hash);
-                            text = "[Desktop Entry]\n"
+                            chat.parent.children[".directory"].content.reset();
+                            chat.parent.children[".directory"].content.write(
+                                "[Desktop Entry]\n"
                                 + "Version=1.0\n"
                                 + "Type=Directory\n"
+                                + "MimeType=inode/directory;\n"
                                 + "Name=Contact\n"
                                 + "Comment=" + chat.parent.name + "\n"
-                                + "Icon=" + path +  "\n";
-                            if (!chat.parent.children[".directory"]) {
-                                var f = new fs.File("directory", text);
-                                chat.parent.children[".directory"] = f;
-                                f.setMode("rwxr-xr-x");
-                                f.parent = chat.parent;
-                                f.write = function (offset, len, buf, fd, callback) {
-                                    return callback(fs.E.OK);
-                                };
-                            }
-                            chat.parent.children[".directory"].content.reset();
-                            chat.parent.children[".directory"].content.write(text);
+                                + "Icon=" + path);
                             break;
                         }
                     }
