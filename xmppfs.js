@@ -116,6 +116,13 @@ root.mkdir = function (name, mode, callback) {
         }
         callback(fs.E.OK);
     };
+    node.readdir = function (callback) {
+        callback(fs.E.OK, Object.keys(this.children).map(function (name) {
+            if (name === "roster" && this.children[name].hidden)
+                    name = "." + name;
+            return name;
+        }.bind(this)));
+    };
     node.children.roster.chats = {};
     node.children.roster.hidden = true;
     node.children.state.on('state', function (state) {
@@ -162,8 +169,11 @@ root.mkdir = function (name, mode, callback) {
                 if (err) return console.error("roster:",err);
                 items.forEach(function (item) {
                     console.log(item.attrs);
+                    var isnew = !node.children.roster.children[
+                        (new xmpp.JID(item.attrs.jid)).bare().toString()];
                     var chat = getChat(node.children.roster,
                                        {attrs:{from:item.attrs.jid}});
+                    if (isnew) chat.parent.hidden = true;
                     if (!chat.children.subscription) {
                         var f = new fs.State("subscription",
                             ["from", "to", "both"],
@@ -206,6 +216,7 @@ root.mkdir = function (name, mode, callback) {
                 node.children[chat.parent.name] = chat.parent;
                 node.chats[chat.parent.name] = chat.parent;
             }
+            chat.parent.hidden = false;
             chat.children.presence.content.write(stanza.toString() + "\n");
             ;["show","status","priority"].forEach(function (name) { var text;
                 if ((text = stanza.getChildText(name))) {
