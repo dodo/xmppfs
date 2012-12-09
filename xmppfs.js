@@ -74,6 +74,7 @@ function openChat(node, from) {
     node.chats[name] = jid;
     jid.openChat = open;
     jid.parent = node;
+    jid.setMode("r-xr-xr-x");
     jid.mkdir = function (resource, mode, callback) {
         open(resource);
         callback(fs.E.OK);
@@ -257,6 +258,20 @@ root.mkdir = function (name, mode, callback) {
                             }
                             chat.parent.children[".avatar"].content.reset();
                             chat.parent.children[".avatar"].content.write(blob);
+
+                            var path = Path.join(options.mount, "photos", hash);
+                            text = "[Desktop Entry]\nIcon=" + path +  "\n";
+                            if (!chat.parent.children[".directory"]) {
+                                var f = new fs.File("directory", text);
+                                chat.parent.children[".directory"] = f;
+                                f.setMode("rw-r--r--");
+                                f.parent = chat.parent;
+                                f.write = function (offset, len, buf, fd, callback) {
+                                    return callback(fs.E.OK);
+                                };
+                            }
+                            chat.parent.children[".directory"].content.reset();
+                            chat.parent.children[".directory"].content.write(text);
                             break;
                         }
                     }
