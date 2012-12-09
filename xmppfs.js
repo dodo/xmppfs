@@ -99,6 +99,9 @@ root.mkdir = function (name, mode, callback) {
         password: new fs.File("password", "secret"),
         resource: new fs.File("resource", jid.resource),
         state:    new fs.State("state", ["online", "offline"], "offline"),
+        status:   new fs.File("status", "dodo is using this for tests"),
+        priority: new fs.File("priority", "0"),
+        show:     new fs.File("show", "chat"),
         iqs:      new fs.File("iq"),
     });
     node.chats = {};
@@ -150,7 +153,11 @@ root.mkdir = function (name, mode, callback) {
             node.children.resource.setMode("r--r--r--");
             node.children.resource.content.write("" + node.jid.resource);
             client.router.f.presence.send({
-                show:"chat", status:"dodo is using this for tests"});
+                priority: node.children.priority.content.toString('utf8'),
+                status: node.children.status.content.toString('utf8'),
+                show: node.children.show.content.toString('utf8'),
+                from: client.jid,
+            });
             client.router.f.roster.get(function (err, stanza, items) {
                 if (err) return console.error("roster:",err);
                 items.forEach(function (item) {
