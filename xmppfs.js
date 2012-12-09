@@ -105,7 +105,11 @@ root.mkdir = function (name, mode, callback) {
     node.parent = this;
     this.children[name] = node;
     node.mkdir = function (from, mode, callback) {
-        getChat(node, {attrs:{from:from}});
+        var chat = getChat(node.children.roster, {attrs:{from:from}});
+        if (chat.parent && !node.chats[chat.parent.name]) {
+            node.children[chat.parent.name] = chat.parent;
+            node.chats[chat.parent.name] = chat.parent;
+        }
         callback(fs.E.OK);
     };
     node.children.roster.chats = {};
@@ -125,6 +129,7 @@ root.mkdir = function (name, mode, callback) {
         var client = node.client = new xmpp.Client({jid:node.jid,
             password:node.children.password.content.toString('utf8')});
         node.children.password.setMode("r--r--r--");
+        node.children.roster.client = client;
         client.router = new Router(client);
         client.router.on('error', console.error.bind(console));
         var onclose = function () {client.end()};
@@ -142,7 +147,7 @@ root.mkdir = function (name, mode, callback) {
             node.children.resource.content.reset();
             node.children.resource.setMode("r--r--r--");
             node.children.resource.content.write("" + node.jid.resource);
-            client.send(new xmpp.Element('presence', { }).
+            client.send(new xmpp.Presence({ }).
                 c('show').t("chat").up().
                 c('status').t("dodo is using this for tests")
             );
@@ -165,7 +170,11 @@ root.mkdir = function (name, mode, callback) {
             process.emit('connection closed');
         });
         client.router.match("self::message", function (stanza) {
-            var chat = getChat(node, stanza);
+            var chat = getChat(node.children.roster, stanza);
+            if (chat.parent && !node.chats[chat.parent.name]) {
+                node.children[chat.parent.name] = chat.parent;
+                node.chats[chat.parent.name] = chat.parent;
+            }
             var message = stanza.getChildText('body');
             if (message) {
                 chat.children.messages.content.write(formatDate() + "> " + message + "\n");
@@ -174,7 +183,11 @@ root.mkdir = function (name, mode, callback) {
             }
         });
         client.router.match("self::presence", function (stanza) {
-            var chat = getChat(node, stanza);
+            var chat = getChat(node.children.roster, stanza);
+            if (chat.parent && !node.chats[chat.parent.name]) {
+                node.children[chat.parent.name] = chat.parent;
+                node.chats[chat.parent.name] = chat.parent;
+            }
             chat.children.presence.content.write(stanza.toString() + "\n");
         });
         client.router.match("self::iq", function (stanza) {
