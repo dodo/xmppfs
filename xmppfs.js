@@ -97,7 +97,7 @@ root.mkdir = function (name, mode, callback) {
         roster:   new fs.Directory("roster"),
         password: new fs.File("password", "secret"),
         resource: new fs.File("resource", jid.resource),
-        state:    new fs.State("state"),
+        state:    new fs.State("state", ["online", "offline"], "offline"),
         iqs:      new fs.File("iq"),
     });
     node.chats = {};

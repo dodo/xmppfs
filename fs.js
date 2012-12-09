@@ -121,11 +121,18 @@ File.prototype.truncate = function (offset, callback) {
 
 exports.State = State;
 inherits(State, Node);
-function State(name, defaultvalue) {
+function State(name, options, defaultvalue) {
     State.super.call(this, name);
-    this.content = defaultvalue || "offline";
+    this.options = options || [];
+    this.content = defaultvalue || this.options[0];
     this.setMode("rw-rw-rw-");
 }
+State.prototype.setState = function (state) {
+    if (this.content === state) return;
+    this.content = state;
+    this.emit('state', state);
+};
+
 State.prototype.open     = File.prototype.open;
 State.prototype.getattr  = File.prototype.getattr;
 State.prototype.truncate = function (offset, callback) {
@@ -139,12 +146,11 @@ State.prototype.read  = function (offset, len, buf, fd, callback) {
 State.prototype.write = function (offset, len, buf, fd, callback) {
     var err = E.OK;
     var data = trim(buf.toString('utf8')); // read the new data
-    if (data != "offline" && data != "online") {
+    if (this.options.indexOf(data) === -1) {
         err = -E.EKEYREJECTED;
     } else {
         err = len;
-        this.content = data;
-        this.emit('state', data);
+        this.setState(data);
     }
     callback(err);
 };
