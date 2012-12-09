@@ -8,7 +8,7 @@ exports.Router = Router;
 inherits(Router, EventEmitter);
 function Router(connection, timeout) {
     this.connection = connection;
-    this.timeout = timeout || 1000;
+    this.timeout = timeout || 5000; // 5 seconds
     this.xpath = new ltxXPath();
     this.onstanza = this.onstanza.bind(this);
 }
