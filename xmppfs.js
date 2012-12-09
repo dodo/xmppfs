@@ -4,6 +4,7 @@ var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
 var fs = require('./fs');
+var Presence = require('./feature/presence').Presence;
 var Router = require('./feature/router').Router;
 var Roster = require('./feature/roster').Roster;
 var Disco = require('./feature/disco').Disco;
@@ -136,9 +137,10 @@ root.mkdir = function (name, mode, callback) {
         process.on('close connection', onclose);
         connections++;
         client.router.f = {};
-        client.router.f.disco  = new Disco( client.router);
-        client.router.f.roster = new Roster(client.router, client.router.f.disco);
-        client.router.f.ping   = new Ping(  client.router, client.router.f.disco);
+        client.router.f.disco    = new Disco( client.router);
+        client.router.f.presence = new Presence(client.router);
+        client.router.f.roster   = new Roster(client.router, client.router.f.disco);
+        client.router.f.ping     = new Ping(  client.router, client.router.f.disco);
         client.on('stanza', client.router.onstanza);
 
         client.on('online', function  () {
@@ -147,10 +149,8 @@ root.mkdir = function (name, mode, callback) {
             node.children.resource.content.reset();
             node.children.resource.setMode("r--r--r--");
             node.children.resource.content.write("" + node.jid.resource);
-            client.send(new xmpp.Presence({ }).
-                c('show').t("chat").up().
-                c('status').t("dodo is using this for tests")
-            );
+            client.router.f.presence.send({
+                show:"chat", status:"dodo is using this for tests"});
             client.router.f.roster.get(function (err, stanza, items) {
                 if (err) return console.error("roster:",err);
                 items.forEach(function (item) {
@@ -191,7 +191,7 @@ root.mkdir = function (name, mode, callback) {
                     .buffer.slice(chat.children.messages._offset).toString('utf8');
             }
         });
-        client.router.match("self::presence", function (stanza) {
+        client.router.on('presence', function (stanza) {
             var chat = getChat(node.children.roster, stanza);
             if (chat.parent && !node.chats[chat.parent.name]) {
                 node.children[chat.parent.name] = chat.parent;
