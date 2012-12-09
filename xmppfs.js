@@ -163,6 +163,8 @@ root.mkdir = function (name, mode, callback) {
                             item.attrs.subscription);
                         chat.children.subscription = f;
                         f.parent = chat;
+                        client.router.f.presence.send({
+                            type:'probe', from:client.jid, to:item.attrs.jid});
                     }
                     chat.children.subscription.setState(item.attrs.subscription);
                 });
