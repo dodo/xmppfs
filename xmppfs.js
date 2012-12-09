@@ -155,7 +155,16 @@ root.mkdir = function (name, mode, callback) {
                 if (err) return console.error("roster:",err);
                 items.forEach(function (item) {
                     console.log(item.attrs);
-                    getChat(node.children.roster, {attrs:{from:item.attrs.jid}});
+                    var chat = getChat(node.children.roster,
+                                       {attrs:{from:item.attrs.jid}});
+                    if (!chat.children.subscription) {
+                        var f = new fs.State("subscription",
+                            ["from", "to", "both"],
+                            item.attrs.subscription);
+                        chat.children.subscription = f;
+                        f.parent = chat;
+                    }
+                    chat.children.subscription.setState(item.attrs.subscription);
                 });
             });
         });
