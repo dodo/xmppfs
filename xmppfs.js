@@ -108,6 +108,7 @@ root.mkdir = function (name, mode, callback) {
         getChat(node, {attrs:{from:from}});
         callback(fs.E.OK);
     };
+    node.children.roster.chats = {};
     node.children.roster.hidden = true;
     node.children.state.on('state', function (state) {
         if (state === "offline") {
@@ -145,9 +146,12 @@ root.mkdir = function (name, mode, callback) {
                 c('show').t("chat").up().
                 c('status').t("dodo is using this for tests")
             );
-            client.router.f.roster.get(function (elem, match) {
-                // FIXME
-                console.log("got roster:", elem, match)
+            client.router.f.roster.get(function (err, stanza, items) {
+                if (err) return console.error("roster:",err);
+                items.forEach(function (item) {
+                    console.log(item.attrs);
+                    getChat(node.children.roster, {attrs:{from:item.attrs.jid}});
+                });
             });
         });
         client.on('close', function () {

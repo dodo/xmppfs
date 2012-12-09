@@ -21,10 +21,35 @@ var proto = Roster.prototype;
 
 proto.get = function (callback) {
     var id = util.id("roster");
-    this.router.request("self::iq[@id='" + id + "']", callback);
+    this.router.request("self::iq[@id='" + id + "']/roster:query/item",
+                        {roster:NS.roster}, callback);
     this.router.send(new xmpp.Iq({id:id,type:'get'})
         .c("query", {xmlns:NS.roster}).up());
 
+};
+
+proto.subscribe = function(jid, message) {
+    var pres = new xmpp.Presence({to:jid, type:'subscribe'});
+    if (message && message != "") pres.c("status").t(message);
+    this.router.send(pres);
+};
+
+proto.unsubscribe = function(jid, message) {
+    var pres = new xmpp.Presence({to:jid, type:'unsubscribe'});
+    if (message && message != "") pres.c("status").t(message);
+    this.router.send(pres);
+};
+
+proto.authorize = function(jid, message) {
+    var pres = new xmpp.Presence({to:jid, type:'subscribed'});
+    if (message && message != "") pres.c("status").t(message);
+    this.router.send(pres);
+};
+
+proto.unauthorize = function(jid, message) {
+    var pres = new xmpp.Presence({to:jid, type:'unsubscribed'});
+    if (message && message != "") pres.c("status").t(message);
+    this.router.send(pres);
 };
 
 
@@ -33,6 +58,6 @@ proto.update_items = function (stanza, match) {
 };
 
 proto.update_presence = function (stanza, match) {
-    console.error("update_presence", stanza.toString(), match.toString());
+    console.log("update_presence", stanza.toString(), match.toString());
 };
 

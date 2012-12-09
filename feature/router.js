@@ -1,3 +1,4 @@
+var __slice = [].slice;
 var EventEmitter = require('events').EventEmitter;
 
 var inherits = require('inherits');
@@ -33,10 +34,11 @@ Router.prototype.request = function (xpath, namespaces, callback) {
         this.xpath.removeListener(xpath, response);
         if (callback) callback("timeout");
     }.bind(this), this.timeout);
-    this.xpath.once(xpath, namespaces, function response(stanza) {
+    var response = function (/*stanza, match*/) {
         clearTimeout(timeout);
-        if (callback) callback(null, stanza);
-    });
+        if (callback) callback.apply(this, [null].concat(__slice.call(arguments)));
+    };
+    this.xpath.once(xpath, namespaces, response);
     return this;
 };
 
