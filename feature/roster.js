@@ -57,7 +57,7 @@ proto.update_items = function (stanza, match) {
     console.log("update_items", stanza.toString(), match.toString());
 };
 
-proto.update_presence = function (stanza, match) {
-    console.log("update_presence", stanza.toString(), match.toString());
+proto.update_presence = function (stanza) {
+    console.log("update_presence", stanza.toString());
 };
 
