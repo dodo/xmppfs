@@ -5,6 +5,7 @@ var f4js = require('fuse4js');
 
 var fs = require('./fs');
 var Router = require('./feature/router').Router;
+var Roster = require('./feature/roster').Roster;
 var Disco = require('./feature/disco').Disco;
 var Ping = require('./feature/ping').Ping;
 
@@ -129,8 +130,9 @@ root.mkdir = function (name, mode, callback) {
         process.on('close connection', onclose);
         connections++;
         client.router.f = {};
-        client.router.f.disco = new Disco(client.router);
-        client.router.f.ping  = new Ping(client.router, client.router.f.disco);
+        client.router.f.disco  = new Disco( client.router);
+        client.router.f.roster = new Roster(client.router, client.router.f.disco);
+        client.router.f.ping   = new Ping(  client.router, client.router.f.disco);
         client.on('stanza', client.router.onstanza);
 
         client.on('online', function  () {
@@ -143,6 +145,10 @@ root.mkdir = function (name, mode, callback) {
                 c('show').t("chat").up().
                 c('status').t("dodo is using this for tests")
             );
+            client.router.f.roster.get(function (elem, match) {
+                // FIXME
+                console.log("got roster:", elem, match)
+            });
         });
         client.on('close', function () {
             node.children.roster.hidden = true;
