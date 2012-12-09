@@ -8,6 +8,7 @@ var Presence = require('./feature/presence').Presence;
 var Router = require('./feature/router').Router;
 var Roster = require('./feature/roster').Roster;
 var Disco = require('./feature/disco').Disco;
+var VCard = require('./feature/vcard').VCard;
 var Ping = require('./feature/ping').Ping;
 
 var options = {
@@ -148,6 +149,7 @@ root.mkdir = function (name, mode, callback) {
         connections++;
         client.router.f = {};
         client.router.f.disco    = new Disco( client.router);
+        client.router.f.vcard    = new VCard( client.router);
         client.router.f.presence = new Presence(client.router);
         client.router.f.roster   = new Roster(client.router, client.router.f.disco);
         client.router.f.ping     = new Ping(  client.router, client.router.f.disco);
@@ -230,6 +232,26 @@ root.mkdir = function (name, mode, callback) {
                     chat.children[name].content.write(text);
                 }
             });
+            var s; if ((s = stanza.getChild("x", VCard.NS.update)) && s.getChildText("photo")) {
+                client.router.f.vcard.get(stanza.attrs.from, function (err, stanza, match) {
+                    if (err) return console.error("fetch errored:", err);
+                    for (var text, i = 0; i < match.length ; i++) {
+                        if (match[i].name === "PHOTO" &&
+                           (text = match[i].getChildText("BINVAL"))) {
+                            var blob = new Buffer(text, 'base64');
+                            if (!chat.children.avatar) {
+                                var f = new fs.File("avatar", blob);
+                                chat.children.avatar = f;
+                                f.setMode("r--r--r--");
+                                f.parent = chat;
+                            }
+                            chat.children.avatar.content.reset();
+                            chat.children.avatar.content.write(blob);
+                            break;
+                        }
+                    }
+                });
+            }
         });
         client.router.match("self::iq", function (stanza) {
             node.children.iqs.content.write(stanza.toString() + "\n");
