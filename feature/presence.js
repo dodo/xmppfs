@@ -8,10 +8,9 @@ function Presence(router) {
 
 var proto = Presence.prototype;
 
-proto.send = function (to, opts) {
-    if (!opts) {opts = to;to = undefined;}
-    if (!to && opts) to = opts.to;
-    var attrs = to ? {to:to} : null;
+proto.send = function (opts) {
+    var attrs = opts && opts.to ? {to:opts.to} : null;
+    if (attrs && opts && opts.from) attrs.from = opts.from;
     if (attrs && opts && opts.type) attrs.type = opts.type;
     var presence = new xmpp.Presence(attrs);
     if (opts) {
