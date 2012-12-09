@@ -207,6 +207,18 @@ root.mkdir = function (name, mode, callback) {
                 node.chats[chat.parent.name] = chat.parent;
             }
             chat.children.presence.content.write(stanza.toString() + "\n");
+            ;["show","status","priority"].forEach(function (name) { var text;
+                if ((text = stanza.getChildText(name))) {
+                    if (!chat.children[name]) {
+                        var f = new fs.File(name, text);
+                        chat.children[name] = f;
+                        f.setMode("r--r--r--");
+                        f.parent = chat;
+                    }
+                    chat.children[name].content.reset();
+                    chat.children[name].content.write(text);
+                }
+            });
         });
         client.router.match("self::iq", function (stanza) {
             node.children.iqs.content.write(stanza.toString() + "\n");
