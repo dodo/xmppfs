@@ -1,9 +1,9 @@
 var Path = require('path');
-var moment = require('moment');
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
 var fs = require('./fs');
+var util = require('./util');
 var Presence = require('./feature/presence').Presence;
 var Router = require('./feature/router').Router;
 var Roster = require('./feature/roster').Roster;
@@ -19,52 +19,23 @@ var options = {
 
 // -----------------------------------------------------------------------------
 
-function formatDate(date) {
-    return "[" + moment(date).format("hh:mm:ss") + "]";
-}
-
-function escapeResource(resource) {
-    return ("" + resource).replace("/", "_");
-}
-
 function openChat(node, from) {
     var name = from.bare().toString();
     if (node.chats[name]) {
-        return node.chats[name].openChat(escapeResource(from.resource));
+        return node.chats[name].openChat(util.escapeResource(from.resource));
     }
     var open = function (resource) {
         var chat = jid.add(resource, new fs.Directory({
-            messages: new fs.File(),
+            messages: new fs.Chat(node),
             presence: new fs.File(),
         }));
         chat.children.presence.setMode("r--r--r--");
-        chat.children.messages._offset = 0;
-        chat.children.messages._new = "";
-        var old_read = chat.children.messages.read;
-        chat.children.messages.read = function (offset, len, buf, fd, callback) {
-            this._offset = this.content.length;
-            this._new = "";
-            return old_read.call(this, offset, len, buf, fd, callback);
-        };
-        chat.children.messages.write = function (offset, len, buf, fd, callback) {
-            if (!node.client) return callback(fs.E.OK);
+        chat.children.messages.on('message', function (buf) {
             var to = new xmpp.JID(name);
-            if (this._offset + this._new.length === offset)
-                this.content.write(this._new + formatDate() + "< " + buf.toString('utf8') + "\n");
-            else {
-                this.content.write(buf.slice(0,this._offset).toString('utf8')
-                    + this._new + formatDate() + "< "
-                    + buf.slice(this._offset).toString('utf8')
-                    + "\n");
-            }
             to.setResource(resource === "undefined" ? undefined : resource);
-            node.client.send(new xmpp.Element('message', {to:to, type:'chat'})
-                .c('body').t(buf.slice(this._offset + this._new.length - offset).toString('utf8'))
-            );
-            this._offset = 0;
-            this._new = "";
-            callback(len);
-        };
+            node.client.send(new xmpp.Message({to:to, type:'chat'})
+                .c('body').t(buf.toString('utf8')));
+        });
         return chat;
     }
     var jid = node.add(name, new fs.Directory());
@@ -83,14 +54,14 @@ function openChat(node, from) {
         open(resource);
         callback(fs.E.OK);
     };
-    return open(escapeResource(from.resource));
+    return open(util.escapeResource(from.resource));
 }
 
 function getChat(node, stanza) {
     var chat, from = new xmpp.JID(stanza.attrs.from);
     if (!(chat = node.chats[from.bare().toString()]))
         chat = openChat(node, from);
-    else if (!(chat = chat.children[escapeResource(from.resource)]))
+    else if (!(chat = chat.children[util.escapeResource(from.resource)]))
         chat = openChat(node, from);
     return chat;
 }
@@ -213,7 +184,7 @@ root.mkdir = function (name, mode, callback) {
                     node.children[chat.parent.name] = chat.parent;
                     node.chats[chat.parent.name] = chat.parent;
                 }
-                chat.children.messages.content.write(formatDate() + "> " + message + "\n");
+                chat.children.messages.content.write(util.formatDate() + "> " + message + "\n");
                 chat.children.messages._new = chat.children.messages.content
                     .buffer.slice(chat.children.messages._offset).toString('utf8');
             }

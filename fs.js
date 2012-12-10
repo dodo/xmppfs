@@ -2,9 +2,11 @@ var Path = require('path');
 var EventEmitter = require('events').EventEmitter;
 var BufferStream = require('bufferstream');
 var inherits = require('inherits');
+var xmpp = require('node-xmpp');
 var extend = require('extend');
 var trim = require('trim');
 var mode = require('./mode');
+var util = require('./util');
 var __slice = [].slice;
 
 
@@ -169,6 +171,7 @@ State.prototype.write = function (offset, len, buf, fd, callback) {
     callback(err);
 };
 
+
 exports.DesktopEntry = DesktopEntry;
 inherits(DesktopEntry, File);
 function DesktopEntry(options) {
@@ -194,6 +197,38 @@ DesktopEntry.prototype.setOptions = function (options) {
     }.bind(this));
     this.content.reset();
     this.content.write(this.toString('content'));
+};
+
+
+exports.Chat = Chat;
+inherits(Chat, File);
+function Chat(root, content) {
+    Chat.super.call(this, content);
+    this._offset = 0;
+    this.root = root;
+    this._new = "";
+}
+
+Chat.prototype.read = function () {
+    this._offset = this.content.length;
+    this._new = "";
+    return Chat.super.prototype.read.apply(this, __slice.call(arguments));
+}
+
+Chat.prototype.write = function (offset, len, buf, fd, callback) {
+    if (!this.root.client) return callback(fs.E.OK);
+    if (this._offset + this._new.length === offset)
+        this.content.write(this._new + util.formatDate() + "< " + buf.toString('utf8') + "\n");
+    else {
+        this.content.write(buf.slice(0,this._offset).toString('utf8')
+            + this._new + util.formatDate() + "< "
+            + buf.slice(this._offset).toString('utf8')
+            + "\n");
+    }
+    this.emit('message', buf.slice(this._offset + this._new.length - offset));
+    this._offset = 0;
+    this._new = "";
+    callback(len);
 };
 
 // -----------------------------------------------------------------------------
