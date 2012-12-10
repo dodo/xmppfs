@@ -233,17 +233,25 @@ root.mkdir = function (name, mode, callback) {
                     chat.children[name].content.write(text);
                 }
             });
-            var s, hash;
-            if ((s = stanza.getChild("x", VCard.NS.update)) &&
-                (hash = s.getChildText("photo"))) {
-                client.router.f.vcard.get(stanza.attrs.from, function (err, stanza, match) {
+        });
+        client.router.match("self::presence[not(@type)]/child::vcupdate:x",
+                            {vcupdate:VCard.NS.update},
+                            function (stanza, match) { var hash;
+            var chat = getChat(node.children.roster, stanza);
+            if (chat.parent && !node.chats[chat.parent.name]) {
+                node.children[chat.parent.name] = chat.parent;
+                node.chats[chat.parent.name] = chat.parent;
+            }
+            match = match.filter(function (m) {return typeof(m)!=='string'});
+            if ((hash = match[0].getChildText("photo"))) {
+                client.router.f.vcard.get(stanza.attrs.from, function (err, stanza, vcard) {
                     if (err) return console.error("fetch errored:", err);
-                    for (var text, i = 0; i < match.length ; i++) {
-                        if (match[i].name === "PHOTO" &&
-                           (text = match[i].getChildText("BINVAL"))) {
+                    for (var text, i = 0; i < vcard.length ; i++) {
+                        if (vcard[i].name === "PHOTO" &&
+                           (text = vcard[i].getChildText("BINVAL"))) {
                             var blob = new Buffer(text, 'base64');
                             var ext = "";
-                            if ((ext = match[i].getChildText("TYPE")))
+                            if ((ext = vcard[i].getChildText("TYPE")))
                                 ext = ext.replace("image/",".");
                             else ext = "";
                             var name = "avatar" + ext;
