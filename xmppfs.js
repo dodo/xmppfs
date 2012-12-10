@@ -206,12 +206,12 @@ root.mkdir = function (name, mode, callback) {
         });
         client.router.match("self::message", function (stanza) {
             var chat = getChat(node.children.roster, stanza);
-            if (chat.parent && !node.chats[chat.parent.name]) {
-                node.children[chat.parent.name] = chat.parent;
-                node.chats[chat.parent.name] = chat.parent;
-            }
             var message = stanza.getChildText('body');
             if (message) {
+                if (chat.parent && !node.chats[chat.parent.name]) {
+                    node.children[chat.parent.name] = chat.parent;
+                    node.chats[chat.parent.name] = chat.parent;
+                }
                 chat.children.messages.content.write(formatDate() + "> " + message + "\n");
                 chat.children.messages._new = chat.children.messages.content
                     .buffer.slice(chat.children.messages._offset).toString('utf8');
@@ -219,10 +219,6 @@ root.mkdir = function (name, mode, callback) {
         });
         client.router.on('presence', function (stanza) {
             var chat = getChat(node.children.roster, stanza);
-            if (chat.parent && !node.chats[chat.parent.name]) {
-                node.children[chat.parent.name] = chat.parent;
-                node.chats[chat.parent.name] = chat.parent;
-            }
             chat.parent.hidden = !!stanza.attrs.type;
             chat.children.presence.content.write(stanza.toString() + "\n");
             ;["show","status","priority"].forEach(function (name) { var text;
@@ -238,13 +234,10 @@ root.mkdir = function (name, mode, callback) {
                             {vcupdate:VCard.NS.update},
                             function (stanza, match) { var hash;
             var chat = getChat(node.children.roster, stanza);
-            if (chat.parent && !node.chats[chat.parent.name]) {
-                node.children[chat.parent.name] = chat.parent;
-                node.chats[chat.parent.name] = chat.parent;
-            }
             match = match.filter(function (m) {return typeof(m)!=='string'});
             if ((hash = match[0].getChildText("photo"))) {
-                client.router.f.vcard.get(stanza.attrs.from, function (err, stanza, vcard) {
+                client.router.f.vcard.get(stanza.attrs.from,
+                                          function (err, stanza, vcard) {
                     if (err) return console.error("fetch errored:", err);
                     for (var text, i = 0; i < vcard.length ; i++) {
                         if (vcard[i].name === "PHOTO" &&
