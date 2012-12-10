@@ -260,6 +260,11 @@ root.mkdir = function (name, mode, callback) {
                                 root.children.photos.add(hash, f);
                                 chat.parent.add(".avatar", f);
                                 f.setMode("r--r--r--");
+                                if (client.jid.bare().equals(
+                                    (new xmpp.JID(stanza.attrs.from)).bare())) {
+                                    node.add(".avatar", f);
+                                    node.add(name, f);
+                                }
                             }
                             chat.parent.children[".avatar"].content.reset();
                             chat.parent.children[".avatar"].content.write(blob);
