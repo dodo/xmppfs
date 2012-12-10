@@ -67,15 +67,14 @@ function openChat(node, from) {
         };
         return chat;
     }
-    var jid = node.add(name, new fs.Directory({
-        ".directory": new fs.File(".directory",
-            "[Desktop Entry]\n"
-            + "Version=1.0\n"
-            + "Type=Directory\n"
-            + "MimeType=inode/directory;\n"
-            + "Name=Contact\n"
-            + "Comment=" + name + "\n"
-            + "Icon=user-identity\n")
+    var jid = node.add(name, new fs.Directory());
+    jid.add(new fs.DesktopEntry({
+        Version:"1.0",
+        Type:"Directory",
+        MimeType:"inode/directory;",
+        Name:"Contact",
+        Comment:name,
+        Icon:"user-identity",
     }));
     node.chats[name] = jid;
     jid.openChat = open;
@@ -103,10 +102,7 @@ root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
     console.log("create new jid " + jid);
     var node = this.add(jid.bare().toString(), new fs.Directory({
-        roster:   new fs.Directory({
-            ".directory": new fs.File("[Desktop Entry]\n"
-                + "Icon=x-office-address-book\n")
-        }),
+        roster:   new fs.Directory(),
         password: new fs.File("secret"),
         resource: new fs.File(jid.resource),
         state:    new fs.State(["online", "offline"], "offline"),
@@ -134,6 +130,9 @@ root.mkdir = function (name, mode, callback) {
     };
     node.children.roster.chats = {};
     node.children.roster.hidden = true;
+    node.children.roster.add(new fs.DesktopEntry({
+        Icon:"x-office-address-book",
+    }));
     node.children.state.on('state', function (state) {
         if (state === "offline") {
             if (node.client) {
@@ -257,16 +256,9 @@ root.mkdir = function (name, mode, callback) {
                             chat.parent.children[".avatar"].content.reset();
                             chat.parent.children[".avatar"].content.write(blob);
 
-                            var path = Path.join(options.mount, "photos", hash);
-                            chat.parent.children[".directory"].content.reset();
-                            chat.parent.children[".directory"].content.write(
-                                "[Desktop Entry]\n"
-                                + "Version=1.0\n"
-                                + "Type=Directory\n"
-                                + "MimeType=inode/directory;\n"
-                                + "Name=Contact\n"
-                                + "Comment=" + chat.parent.name + "\n"
-                                + "Icon=" + path + "\n");
+                            chat.parent.children[".directory"].setOptions({
+                                Icon:Path.join(options.mount, "photos", hash),
+                            });
                             break;
                         }
                     }

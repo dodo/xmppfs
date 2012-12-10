@@ -33,7 +33,7 @@ Node.prototype.prefix = "-";
 function Node() {
     Node.super.call(this);
     var now = new Date();
-    this.name = "";
+    this.name = this.name || "";
     this.hidden = false;
     this.stats = {
         uid:process.getuid(),
@@ -167,6 +167,33 @@ State.prototype.write = function (offset, len, buf, fd, callback) {
         this.setState(data);
     }
     callback(err);
+};
+
+exports.DesktopEntry = DesktopEntry;
+inherits(DesktopEntry, File);
+function DesktopEntry(options) {
+    this.name = ".directory";
+    this.options = options || {};
+    DesktopEntry.super.call(this, this.toString('content'));
+}
+
+DesktopEntry.prototype.toString = function (mode) {
+    if (mode !== 'content')
+        return DesktopEntry.super.toString.apply(this, __slice.call(arguments));
+    return ["[Desktop Entry]"].concat(
+      Object.keys(this.options).map(function (key) {
+        return key + "=" + this.options[key];
+    }.bind(this))).join("\n") + "\n";
+}
+
+DesktopEntry.prototype.setOptions = function (options) {
+    Object.keys(options || {}).forEach(function (key) {
+        if (options[key] === undefined || options[key] === null)
+            delete options[key];
+        else this.options[key] = options[key];
+    }.bind(this));
+    this.content.reset();
+    this.content.write(this.toString('content'));
 };
 
 // -----------------------------------------------------------------------------
