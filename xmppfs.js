@@ -137,7 +137,7 @@ root.mkdir = function (name, mode, callback) {
         if (state === "offline") {
             if (node.client) {
                 console.log("disconnect client %s …", node.jid.toString());
-                node.client.end();
+                if (node.client.connection.socket) node.client.end();
                 delete node.client;
             }
             return;
@@ -196,6 +196,7 @@ root.mkdir = function (name, mode, callback) {
         });
         client.on('close', function () {
             node.children.roster.hidden = true;
+            node.children.state.setState("offline");
             node.children.resource.setMode("rw-rw-rw-");
             node.children.password.setMode("rw-rw-rw-");
             console.log("client %s offline.", node.jid.toString());
