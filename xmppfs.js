@@ -230,9 +230,7 @@ root.mkdir = function (name, mode, callback) {
                 }
             });
         });
-        client.router.match("self::presence[not(@type)]/child::vcupdate:x",
-                            {vcupdate:VCard.NS.update},
-                            function (stanza, match) { var hash;
+        client.router.f.vcard.on('update', function (stanza, match) { var hash;
             var chat = getChat(node.children.roster, stanza);
             match = match.filter(function (m) {return typeof(m)!=='string'});
             if ((hash = match[0].getChildText("photo"))) {

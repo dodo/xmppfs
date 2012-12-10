@@ -1,3 +1,5 @@
+var EventEmitter = require('events').EventEmitter;
+var inherits = require('inherits');
 var xmpp = require('node-xmpp');
 var util = require('./util');
 
@@ -7,8 +9,18 @@ var NS = {
 };
 
 exports.VCard = VCard;
+inherits(VCard, EventEmitter);
 function VCard(router) {
+    VCard.super.call(this);
     this.router = router;
+    this.on('newListener', onlistener);
+    function onlistener(event, listener) {
+        if (event !== 'update') return;
+        this.removeListener('newListener', onlistener);
+        this.router.match("self::presence[not(@type)]/child::vcupdate:x",
+                          {vcupdate:NS.update},
+                          this.emit.bind(this, 'update'));
+    }
 };
 VCard.NS = NS;
 var proto = VCard.prototype;
@@ -22,6 +34,7 @@ proto.get = function (to, callback) {
     this.router.send(new xmpp.Iq({to:to,id:id,type:'get',from:this.router.connection.jid})
         .c("vCard", {xmlns:NS.vcard}).up());
 };
+
 proto.set = function (to, vcard, callback) {
     if (!callback) {callback = vcard; vcard = to; to = undefined;}
     if (!callback) {callback = vcard; vcard = undefined;}
