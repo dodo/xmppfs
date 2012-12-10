@@ -30,10 +30,10 @@ function join(node) {return node ? (join(node.parent) + "/" + node.name) : ""};
 exports.Node = Node;
 inherits(Node, EventEmitter);
 Node.prototype.prefix = "-";
-function Node(name) {
+function Node() {
     Node.super.call(this);
     var now = new Date();
-    this.name = name;
+    this.name = "";
     this.hidden = false;
     this.stats = {
         uid:process.getuid(),
@@ -53,14 +53,25 @@ Node.prototype.setMode = function (newmode) {
 exports.Directory = Directory;
 inherits(Directory, Node);
 Directory.prototype.prefix = "d";
-function Directory(name, children) {
-    Directory.super.call(this, name);
+function Directory(children) {
+    Directory.super.call(this);
     this.children = children || {};
     this.stats.size = 4096;
-    Object.keys(this.children).forEach(function (k) {
-        this.children[k].parent = this;
-    }.bind(this));
+    Object.keys(this.children).forEach(this.add.bind(this));
     this.setMode("r--r--r--");
+}
+
+Directory.prototype.add = function (name, child) {
+    if (typeof(name) !== 'string') {child = name; name = undefined;}
+    if (typeof(child) !== 'object') child = null;
+    if (!name && child) name = child.name;
+    if (!child && name) child = this.children[name];
+    if (!child) return console.error("no child!");
+    if (!name) return console.error("no name!");
+    this.children[name] = child;
+    if (!child.parent) child.parent = this;
+    if (!child.name) child.name = name;
+    return child;
 }
 
 Directory.prototype.open = function (flags, callback) {
@@ -85,8 +96,8 @@ Directory.prototype.readdir = function (callback) {
 
 exports.File = File;
 inherits(File, Node);
-function File(name, content) {
-    File.super.call(this, name);
+function File(content) {
+    File.super.call(this);
     this.content = new BufferStream({size:'flexible'});
     if (content) this.content.write(content);
     this.setMode("rw-rw-rw-");
@@ -124,8 +135,8 @@ File.prototype.truncate = function (offset, callback) {
 
 exports.State = State;
 inherits(State, Node);
-function State(name, options, defaultvalue) {
-    State.super.call(this, name);
+function State(options, defaultvalue) {
+    State.super.call(this);
     this.options = options || [];
     this.content = defaultvalue || this.options[0];
     this.setMode("rw-rw-rw-");

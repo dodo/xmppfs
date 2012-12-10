@@ -33,12 +33,10 @@ function openChat(node, from) {
         return node.chats[name].openChat(escapeResource(from.resource));
     }
     var open = function (resource) {
-        var chat = new fs.Directory(resource, {
-            messages: new fs.File("messages"),
-            presence: new fs.File("presence"),
-        });
-        chat.parent = jid;
-        jid.children[resource] = chat;
+        var chat = jid.add(resource, new fs.Directory({
+            messages: new fs.File(),
+            presence: new fs.File(),
+        }));
         chat.children.presence.setMode("r--r--r--");
         chat.children.messages._offset = 0;
         chat.children.messages._new = "";
@@ -69,7 +67,7 @@ function openChat(node, from) {
         };
         return chat;
     }
-    var jid = new fs.Directory(name, {
+    var jid = node.add(name, new fs.Directory({
         ".directory": new fs.File(".directory",
             "[Desktop Entry]\n"
             + "Version=1.0\n"
@@ -77,20 +75,14 @@ function openChat(node, from) {
             + "MimeType=inode/directory;\n"
             + "Name=Contact\n"
             + "Comment=" + name + "\n"
-            + "Icon=user-identity")
-    });
-    node.children[name] = jid;
+            + "Icon=user-identity\n")
+    }));
     node.chats[name] = jid;
     jid.openChat = open;
-    jid.parent = node;
     jid.setMode("r-xr-xr-x");
     jid.mkdir = function (resource, mode, callback) {
         open(resource);
         callback(fs.E.OK);
-    };
-    jid.children[".directory"].setMode("rwxr-xr-x");
-    jid.children[".directory"].write = function (offset, len, buf, fd, callback) {
-        return callback(fs.E.OK);
     };
     return open(escapeResource(from.resource));
 }
@@ -105,28 +97,26 @@ function getChat(node, stanza) {
 }
 
 var connections = 0;
-var root = new fs.Directory("", {photos:new fs.Directory("photos")});
+var root = new fs.Directory({photos:new fs.Directory()});
 root.children.photos.hidden = true;
 root.mkdir = function (name, mode, callback) {
     var jid = new xmpp.JID(name);
     console.log("create new jid " + jid);
-    var node = new fs.Directory(jid.bare().toString(), {
-        roster:   new fs.Directory("roster", {
-            ".directory": new fs.File(".directory", "[Desktop Entry]\n"
-                + "Icon=x-office-address-book")
+    var node = this.add(jid.bare().toString(), new fs.Directory({
+        roster:   new fs.Directory({
+            ".directory": new fs.File("[Desktop Entry]\n"
+                + "Icon=x-office-address-book\n")
         }),
-        password: new fs.File("password", "secret"),
-        resource: new fs.File("resource", jid.resource),
-        state:    new fs.State("state", ["online", "offline"], "offline"),
-        status:   new fs.File("status", "dodo is using this for tests"),
-        priority: new fs.File("priority", "0"),
-        show:     new fs.File("show", "chat"),
-        iqs:      new fs.File("iq"),
-    });
+        password: new fs.File("secret"),
+        resource: new fs.File(jid.resource),
+        state:    new fs.State(["online", "offline"], "offline"),
+        status:   new fs.File("dodo is using this for tests"),
+        priority: new fs.File("0"),
+        show:     new fs.File("chat"),
+        iqs:      new fs.File(),
+    }));
     node.chats = {};
     node.jid = jid;
-    node.parent = this;
-    this.children[name] = node;
     node.mkdir = function (from, mode, callback) {
         var chat = getChat(node.children.roster, {attrs:{from:from}});
         if (chat.parent && !node.chats[chat.parent.name]) {
@@ -195,11 +185,9 @@ root.mkdir = function (name, mode, callback) {
                                        {attrs:{from:item.attrs.jid}});
                     if (isnew) chat.parent.hidden = true;
                     if (!chat.children.subscription) {
-                        var f = new fs.State("subscription",
+                        var f = chat.add("subscription", new fs.State(
                             ["from", "to", "both"],
-                            item.attrs.subscription);
-                        chat.children.subscription = f;
-                        f.parent = chat;
+                            item.attrs.subscription));
                         client.router.f.presence.send({
                             type:'probe', from:client.jid, to:item.attrs.jid});
                     }
@@ -240,12 +228,8 @@ root.mkdir = function (name, mode, callback) {
             chat.children.presence.content.write(stanza.toString() + "\n");
             ;["show","status","priority"].forEach(function (name) { var text;
                 if ((text = stanza.getChildText(name))) {
-                    if (!chat.children[name]) {
-                        var f = new fs.File(name, text);
-                        chat.children[name] = f;
-                        f.setMode("r--r--r--");
-                        f.parent = chat;
-                    }
+                    if (!chat.children[name])
+                        chat.add(name, new fs.File(text)).setMode("r--r--r--");
                     chat.children[name].content.reset();
                     chat.children[name].content.write(text);
                 }
@@ -265,12 +249,10 @@ root.mkdir = function (name, mode, callback) {
                             else ext = "";
                             var name = "avatar" + ext;
                             if (!chat.parent.children[name]) {
-                                var f = new fs.File(name, blob);
-                                root.children.photos.children[hash] = f;
-                                chat.parent.children[".avatar"] = f;
-                                chat.parent.children[name] = f;
+                                var f = chat.parent.add(name, new fs.File(blob));
+                                root.children.photos.add(hash, f);
+                                chat.parent.add(".avatar", f);
                                 f.setMode("r--r--r--");
-                                f.parent = chat.parent;
                             }
                             chat.parent.children[".avatar"].content.reset();
                             chat.parent.children[".avatar"].content.write(blob);
@@ -284,7 +266,7 @@ root.mkdir = function (name, mode, callback) {
                                 + "MimeType=inode/directory;\n"
                                 + "Name=Contact\n"
                                 + "Comment=" + chat.parent.name + "\n"
-                                + "Icon=" + path);
+                                + "Icon=" + path + "\n");
                             break;
                         }
                     }
