@@ -23,6 +23,10 @@ proto.send = function (opts) {
     return this;
 };
 
+proto.probe = function (to) {
+    this.send({type:'probe', from:this.router.connection.jid, to:to});
+}
+
 proto.presence = function (stanza) {
     this.router.emit('presence', stanza);
 };

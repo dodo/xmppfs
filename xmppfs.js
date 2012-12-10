@@ -175,12 +175,13 @@ root.mkdir = function (name, mode, callback) {
                 show: node.children.show.content.toString('utf8'),
                 from: client.jid,
             });
+            client.router.f.presence.probe(client.jid.bare());
             client.router.f.roster.get(function (err, stanza, items) {
                 if (err) return console.error("roster:",err);
                 items.forEach(function (item) {
                     console.log(item.attrs);
-                    var isnew = !node.children.roster.children[
-                        (new xmpp.JID(item.attrs.jid)).bare().toString()];
+                    var barejid = (new xmpp.JID(item.attrs.jid)).bare().toString();
+                    var isnew = !node.children.roster.children[barejid];
                     var chat = getChat(node.children.roster,
                                        {attrs:{from:item.attrs.jid}});
                     if (isnew) chat.parent.hidden = true;
@@ -188,8 +189,7 @@ root.mkdir = function (name, mode, callback) {
                         var f = chat.add("subscription", new fs.State(
                             ["from", "to", "both"],
                             item.attrs.subscription));
-                        client.router.f.presence.send({
-                            type:'probe', from:client.jid, to:item.attrs.jid});
+                        client.router.f.presence.probe(barejid);
                     }
                     chat.children.subscription.setState(item.attrs.subscription);
                 });
