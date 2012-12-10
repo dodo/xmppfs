@@ -217,6 +217,19 @@ Chat.prototype.read = function () {
 
 Chat.prototype.write = function (offset, len, buf, fd, callback) {
     if (!this.root.client) return callback(fs.E.OK);
+    this.writeOut(buf, offset);
+    this.emit('message', buf.slice(this._offset + this._new.length - offset));
+    this._offset = 0;
+    this._new = "";
+    callback(len);
+};
+
+Chat.prototype.writeIn = function (message) {
+    this.content.write(util.formatDate() + "> " + message + "\n");
+    this._new = this.content.buffer.slice(this._offset).toString('utf8');
+}
+
+Chat.prototype.writeOut = function (buf, offset) {
     if (this._offset + this._new.length === offset)
         this.content.write(this._new + util.formatDate() + "< " + buf.toString('utf8') + "\n");
     else {
@@ -225,11 +238,7 @@ Chat.prototype.write = function (offset, len, buf, fd, callback) {
             + buf.slice(this._offset).toString('utf8')
             + "\n");
     }
-    this.emit('message', buf.slice(this._offset + this._new.length - offset));
-    this._offset = 0;
-    this._new = "";
-    callback(len);
-};
+}
 
 // -----------------------------------------------------------------------------
 

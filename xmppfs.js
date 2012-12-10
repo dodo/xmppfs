@@ -184,9 +184,7 @@ root.mkdir = function (name, mode, callback) {
                     node.children[chat.parent.name] = chat.parent;
                     node.chats[chat.parent.name] = chat.parent;
                 }
-                chat.children.messages.content.write(util.formatDate() + "> " + message + "\n");
-                chat.children.messages._new = chat.children.messages.content
-                    .buffer.slice(chat.children.messages._offset).toString('utf8');
+                chat.children.messages.writeIn(message);
             }
         });
         client.router.on('presence', function (stanza) {
