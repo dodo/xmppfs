@@ -241,9 +241,15 @@ Chat.prototype.writeIn = function (message) {
 };
 
 Chat.prototype.writeOut = function (buf, offset) {
+    var entry = {message:"", x:"<", time:new Date};
+    if (buf.toString().split("").some(function(c){return c.charCodeAt(0)===0})) {
+        entry.message = buf.toString('base64').replace("\n","");
+        this.log.push(entry);
+        this.updateContent();
+        return entry;
+    }
     var i = 0, n = 0;
     var messagelines = this.log[0] ? this.log[0].message.split("\n") : [""];
-    var entry = {message:"", x:"<", time:new Date};
     var rawmessage = new BufferStream({size:'flexible', split:"\n"});
     rawmessage.on('split', function (line) {
         var msg = line.toString('utf8');
