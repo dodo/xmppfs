@@ -207,13 +207,20 @@ function Chat(root, content) {
     this._offset = 0;
     this.root = root;
     this._new = "";
+    this.log = [];
 }
 
 Chat.prototype.read = function () {
     this._offset = this.content.length;
     this._new = "";
     return Chat.super.prototype.read.apply(this, __slice.call(arguments));
-}
+};
+
+Chat.prototype.truncate = function () {
+    this.log = [];
+    this.updateContent();
+    return Chat.super.prototype.truncate.apply(this, __slice.call(arguments));
+};
 
 Chat.prototype.write = function (offset, len, buf, fd, callback) {
     if (!this.root.client) return callback(fs.E.OK);
@@ -224,21 +231,37 @@ Chat.prototype.write = function (offset, len, buf, fd, callback) {
     callback(len);
 };
 
+Chat.prototype.out = function (entry) {
+    this.content.write(""
+        + util.formatDate(entry.time)
+        + entry.x + " "
+        + entry.message
+        + "\n");
+    return entry;
+};
+
+Chat.prototype.updateContent = function () {
+    this.content.reset();
+    this.log.forEach(this.out.bind(this));
+};
+
 Chat.prototype.writeIn = function (message) {
-    this.content.write(util.formatDate() + "> " + message + "\n");
+    this.log.push({message:message, x:">", time:new Date});
     this._new = this.content.buffer.slice(this._offset).toString('utf8');
-}
+    this.updateContent();
+};
 
 Chat.prototype.writeOut = function (buf, offset) {
-    if (this._offset + this._new.length === offset)
-        this.content.write(this._new + util.formatDate() + "< " + buf.toString('utf8') + "\n");
-    else {
-        this.content.write(buf.slice(0,this._offset).toString('utf8')
-            + this._new + util.formatDate() + "< "
-            + buf.slice(this._offset).toString('utf8')
-            + "\n");
+    var entry = {x:"<", time:new Date};
+    if (this._offset + this._new.length === offset) {
+        entry.message = buf.toString('utf8');
+    } else {
+        this.content.write(buf.slice(0, this._offset).toString('utf8') + this._new);
+        entry.message = buf.slice(this._offset).toString('utf8');
     }
-}
+    this.log.push(entry);
+    this.updateContent();
+};
 
 // -----------------------------------------------------------------------------
 
