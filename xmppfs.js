@@ -122,10 +122,11 @@ root.mkdir = function (name, mode, callback) {
         console.log("connect client %s …", node.jid.toString());
         var client = node.client = new xmpp.Client({jid:node.jid,
             password:node.children.password.content.toString('utf8')});
+        client.on('error', console.error.bind(console,"clientErr ="));
         node.children.password.setMode("r--r--r--");
         node.children.roster.client = client;
         client.router = new Router(client);
-        client.router.on('error', console.error.bind(console));
+        client.router.on('error', console.error.bind(console,"routerErr ="));
         var onclose = function () {client.end()};
         process.on('close connection', onclose);
         connections++;
