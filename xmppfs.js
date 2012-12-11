@@ -29,10 +29,14 @@ function openChat(node, from) {
             messages: new fs.Chat(node),
             presence: new fs.File(),
         }));
+        if (resource != "undefined") {
+            chat.add("state", new fs.State(["online", "offline"], "offline"))
+                .setMode("r--r--r--");
+        }
         chat.children.presence.setMode("r--r--r--");
         chat.children.messages.on('message', function (buf) {
             var to = new xmpp.JID(name);
-            to.setResource(resource === "undefined" ? undefined : resource);
+            to.setResource(resource == "undefined" ? undefined : resource);
             node.client.send(new xmpp.Message({to:to, type:'chat'})
                 .c('body').t(buf.toString('utf8')));
         });
@@ -190,6 +194,10 @@ root.mkdir = function (name, mode, callback) {
         client.router.on('presence', function (stanza) {
             var chat = getChat(node.children.roster, stanza);
             chat.parent.hidden = !!stanza.attrs.type;
+            if (chat.children.state) {
+                chat.children.state.setState(
+                    chat.parent.hidden ? "offline" : "online");
+            }
             chat.children.presence.content.write(stanza.toString() + "\n");
             ;["show","status","priority"].forEach(function (name) { var text;
                 if ((text = stanza.getChildText(name))) {
