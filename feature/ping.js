@@ -21,8 +21,8 @@ proto.ping = function (to, callback) {
         .c("ping", {xmlns:NS.ping}).up());
 };
 
-proto.pong = function (stanza) {
-    this.router.emit('ping', stanza);
+proto.pong = function (stanza, match) {
+    this.router.emit('ping', stanza, match);
     this.router.send(new xmpp.Iq({
         to:stanza.attrs.from,
         id:stanza.attrs.id,

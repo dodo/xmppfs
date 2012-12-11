@@ -45,8 +45,8 @@ proto.info = function (to, callback) {
         .c("query", {xmlns:NS['disco#info']}).up());
 };
 
-proto.get_info = function (stanza) {
-    this.router.emit('info', stanza);
+proto.get_info = function (stanza, match) {
+    this.router.emit('info', stanza, match);
     var query = new xmpp.Iq({
         to:stanza.attrs.from,
         id:stanza.attrs.id,
