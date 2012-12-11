@@ -241,7 +241,11 @@ root.mkdir = function (name, mode, callback) {
                             chat.parent.children[".directory"].setOptions({
                                 Icon:Path.join(options.mount, "photos", hash),
                             });
-                            break;
+                        } else if (vcard[i].name === "NICKNAME" &&
+                                  (text = vcard[i].getText())) {
+                            chat.parent.children[".directory"].setOptions({
+                                Comment:text,
+                            });
                         }
                     }
                 });
