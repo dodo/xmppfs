@@ -217,15 +217,13 @@ Chat.prototype.read = function () {
 };
 
 Chat.prototype.truncate = function () {
-    this.log = [];
     this.updateContent();
     return Chat.super.prototype.truncate.apply(this, __slice.call(arguments));
 };
 
 Chat.prototype.write = function (offset, len, buf, fd, callback) {
     if (!this.root.client) return callback(fs.E.OK);
-    this.writeOut(buf, offset);
-    this.emit('message', buf.slice(this._offset + this._new.length - offset));
+    this.emit('message', this.writeOut(buf, offset).message);
     this._offset = 0;
     this._new = "";
     callback(len);
@@ -246,9 +244,11 @@ Chat.prototype.updateContent = function () {
 };
 
 Chat.prototype.writeIn = function (message) {
-    this.log.push({message:message, x:">", time:new Date});
+    var entry = {message:message, x:">", time:new Date}
+    this.log.push(entry);
     this._new = this.content.buffer.slice(this._offset).toString('utf8');
     this.updateContent();
+    return entry;
 };
 
 Chat.prototype.writeOut = function (buf, offset) {
@@ -256,11 +256,11 @@ Chat.prototype.writeOut = function (buf, offset) {
     if (this._offset + this._new.length === offset) {
         entry.message = buf.toString('utf8');
     } else {
-        this.content.write(buf.slice(0, this._offset).toString('utf8') + this._new);
-        entry.message = buf.slice(this._offset).toString('utf8');
+        entry.message = buf.slice(this._offset + this._new.length - offset).toString('utf8');
     }
     this.log.push(entry);
     this.updateContent();
+    return entry;
 };
 
 // -----------------------------------------------------------------------------

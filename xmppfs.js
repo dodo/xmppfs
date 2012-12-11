@@ -34,11 +34,11 @@ function openChat(node, from) {
                 .setMode("r--r--r--");
         }
         chat.children.presence.setMode("r--r--r--");
-        chat.children.messages.on('message', function (buf) {
+        chat.children.messages.on('message', function (message) {
             var to = new xmpp.JID(name);
             to.setResource(resource == "undefined" ? undefined : resource);
             node.client.send(new xmpp.Message({to:to, type:'chat'})
-                .c('body').t(buf.toString('utf8')));
+                .c('body').t(message));
         });
         return chat;
     }
