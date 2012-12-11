@@ -89,11 +89,15 @@ root.mkdir = function (name, mode, callback) {
     node.chats = {};
     node.jid = jid;
     node.mkdir = function (from, mode, callback) {
-        var chat = getChat(node.children.roster, {attrs:{from:from}});
+        from = new xmpp.JID(from).bare();
+        var barejid = from.toString();
+        var chat = getChat(node.children.roster, {attrs:{from:barejid}});
         if (chat.parent && !node.chats[chat.parent.name]) {
             node.children[chat.parent.name] = chat.parent;
             node.chats[chat.parent.name] = chat.parent;
         }
+        if (node.client)
+            node.client.router.f.presence.probe(from);
         callback(fs.E.OK);
     };
     node.readdir = function (callback) {
@@ -162,9 +166,42 @@ root.mkdir = function (name, mode, callback) {
                     if (isnew) chat.parent.hidden = true;
                     if (!chat.children.subscription) {
                         var f = chat.add("subscription", new fs.State(
-                            ["from", "to", "both"],
+                            ["none", "from", "to", "both"],
                             item.attrs.subscription));
                         client.router.f.presence.probe(barejid);
+                        f.on('state', function (state, dir) {
+                            if (dir === 'out') return;
+                            var oldstate = this.content;
+                                   if (oldstate == "from" && state === "to") {
+                                client.router.f.roster.unauthorize(barejid);
+                                client.router.f.roster.subscribe(barejid);
+                            } else if (oldstate == "to" && state === "from") {
+                                client.router.f.roster.authorize(barejid);
+                                client.router.f.roster.unsubscribe(barejid);
+                            } else if (oldstate == "from" && state === "both") {
+                                client.router.f.roster.subscribe(barejid);
+                            } else if (oldstate == "both" && state === "from") {
+                                client.router.f.roster.unsubscribe(barejid);
+                            } else if (oldstate == "from" && state === "none") {
+                                client.router.f.roster.unauthorize(barejid);
+                            } else if (oldstate == "none" && state === "from") {
+                                client.router.f.roster.authorize(barejid);
+                            } else if (oldstate == "both" && state === "to") {
+                                client.router.f.roster.unauthorize(barejid);
+                            } else if (oldstate == "to" && state === "both") {
+                                client.router.f.roster.authorize(barejid);
+                            } else if (oldstate == "both" && state === "none") {
+                                client.router.f.roster.unsubscribe(barejid);
+                                client.router.f.roster.unauthorize(barejid);
+                            } else if (oldstate == "none" && state === "both") {
+                                client.router.f.roster.subscribe(barejid);
+                                client.router.f.roster.authorize(barejid);
+                            } else if (oldstate == "to" && state === "none") {
+                                client.router.f.roster.unsubscribe(barejid);
+                            } else if (oldstate == "none" && state === "to") {
+                                client.router.f.roster.subscribe(barejid);
+                            }
+                        });
                     }
                     chat.children.subscription.setState(item.attrs.subscription);
                 });

@@ -143,10 +143,10 @@ function State(options, defaultvalue) {
     this.content = defaultvalue || this.options[0];
     this.setMode("rw-rw-rw-");
 }
-State.prototype.setState = function (state) {
+State.prototype.setState = function (state, dir) {
     if (this.content === state) return;
+    this.emit('state', state, dir || 'out');
     this.content = state;
-    this.emit('state', state);
 };
 
 State.prototype.open     = File.prototype.open;
@@ -166,7 +166,7 @@ State.prototype.write = function (offset, len, buf, fd, callback) {
         err = -E.EKEYREJECTED;
     } else {
         err = len;
-        this.setState(data);
+        this.setState(data, 'in');
     }
     callback(err);
 };
