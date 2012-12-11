@@ -204,17 +204,9 @@ exports.Chat = Chat;
 inherits(Chat, File);
 function Chat(root, content) {
     Chat.super.call(this, content);
-    this._offset = 0;
     this.root = root;
-    this._new = "";
     this.log = [];
 }
-
-Chat.prototype.read = function () {
-    this._offset = this.content.length;
-    this._new = "";
-    return Chat.super.prototype.read.apply(this, __slice.call(arguments));
-};
 
 Chat.prototype.truncate = function () {
     this.updateContent();
@@ -224,8 +216,6 @@ Chat.prototype.truncate = function () {
 Chat.prototype.write = function (offset, len, buf, fd, callback) {
     if (!this.root.client) return callback(fs.E.OK);
     this.emit('message', this.writeOut(buf, offset).message);
-    this._offset = 0;
-    this._new = "";
     callback(len);
 };
 
@@ -246,18 +236,29 @@ Chat.prototype.updateContent = function () {
 Chat.prototype.writeIn = function (message) {
     var entry = {message:message, x:">", time:new Date}
     this.log.push(entry);
-    this._new = this.content.buffer.slice(this._offset).toString('utf8');
     this.updateContent();
     return entry;
 };
 
 Chat.prototype.writeOut = function (buf, offset) {
-    var entry = {x:"<", time:new Date};
-    if (this._offset + this._new.length === offset) {
-        entry.message = buf.toString('utf8');
-    } else {
-        entry.message = buf.slice(this._offset + this._new.length - offset).toString('utf8');
-    }
+    var i = 0, n = 0;
+    var messagelines = this.log[0] ? this.log[0].message.split("\n") : [""];
+    var entry = {message:"", x:"<", time:new Date};
+    var rawmessage = new BufferStream({size:'flexible', split:"\n"});
+    rawmessage.on('split', function (line) {
+        var msg = line.toString('utf8');
+        if (!this.log[n] || msg.indexOf(messagelines[i]) === -1) {
+            entry.message += msg + "\n";
+            rawmessage.disabled = true; // dont use disable because it resets
+        }
+        if (++i >= messagelines.length) {
+            messagelines = this.log[++n] ? this.log[n].message.split("\n") : [""];
+            i = 0;
+        }
+    }.bind(this));
+    if (offset) rawmessage.write(this.content.buffer.slice(0, offset));
+    rawmessage.write(buf); // sync
+    entry.message += rawmessage.toString('utf8');
     this.log.push(entry);
     this.updateContent();
     return entry;
