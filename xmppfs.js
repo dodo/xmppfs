@@ -212,6 +212,7 @@ root.mkdir = function (name, mode, callback) {
         client.router.f.vcard.on('update', function (stanza, match) { var hash;
             var chat = getChat(node.children.roster, stanza);
             match = match.filter(function (m) {return typeof(m)!=='string'});
+            if(!match.length) return;
             if ((hash = match[0].getChildText("photo"))) {
                 client.router.f.vcard.get(stanza.attrs.from,
                                           function (err, stanza, vcard) {
