@@ -21,9 +21,19 @@ function VCard(router) {
                           {vcupdate:NS.update},
                           this.emit.bind(this, 'update'));
     }
+    this.router.on('send presence', function (presence) {
+        if (!this.hash || presence.attrs.type) return;
+        presence.c("x", {xmlns:NS.update}).c("photo", this.hash);
+    }.bind(this));
 };
 VCard.NS = NS;
 var proto = VCard.prototype;
+
+proto.setPhotoHash = function (hash) {
+    this.hash = hash;
+    console.error("set hash", hash)
+    return this;
+};
 
 proto.get = function (to, callback) {
     if (!callback) {callback = to; to = undefined;}

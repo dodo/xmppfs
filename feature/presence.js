@@ -19,6 +19,7 @@ proto.send = function (opts) {
         });
         if (opts.payload) presence.t(opts.payload);
     }
+    this.router.emit('send presence', presence);
     this.router.send(presence);
     return this;
 };

@@ -1,5 +1,6 @@
 var Path = require('path');
 var extend = require('extend');
+var moment = require('moment');
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
@@ -37,7 +38,7 @@ function openChat(node, from) {
     var open = function (resource) {
         var chat = jid.add(resource, new fs.Directory());
         chat.protected = true;
-        chat.add("presence", new fs.File()).setMode("r--r--r--");
+        chat.add("presence.xml", new fs.File()).setMode("r--r--r--");
         chat.add("messages", new fs.Chat(node)).on('message', function (message) {
             var to = new xmpp.JID(name);
             to.setResource(resource == "undefined" ? undefined : resource);
@@ -102,6 +103,14 @@ root.mkdir = function (name, mode, callback) {
         show:     new fs.File("chat"),
         'iqs.xml':new fs.File(),
     }));
+    node.add(new fs.DesktopEntry({
+        Version:"1.0",
+        Type:"Directory",
+        MimeType:"inode/directory;",
+        Name:"Contact",
+        Comment:name,
+        Icon:"user-identity",
+    })).protected = true;
     node.chats = {};
     node.jid = jid;
     node.mkdir = function (from, mode, callback) {
@@ -148,9 +157,13 @@ root.mkdir = function (name, mode, callback) {
         node.children.roster.client = client;
         client.router = new Router(client);
         client.router.on('error', console.error.bind(console,"routerErr ="));
-        var onclose = function () {client.end()};
+        var onclose = function () {if (client.connection.socket) client.end()};
         process.on('close connection', onclose);
         connections++;
+        client.router.on('send presence', function (presence) {
+            if (presence.attrs.type) return;
+            presence.attrs['xml:lang'] = moment.lang();
+        });
         client.router.f = {};
         client.router.f.disco    = new Disco( client.router, {});
         client.router.f.vcard    = new VCard( client.router);
@@ -161,14 +174,27 @@ root.mkdir = function (name, mode, callback) {
             extend({disco:client.router.f.disco}, VERSION));
         client.router.f.roster.on('error', console.error.bind(console,"roster fetch errored:"));
         client.on('stanza', client.router.onstanza);
+        client.connection.on('error', function (err) {
+            console.error("connection errored: " + err);
+        });
+        client.connection.on('connect', function () {
+            var disco = client.router.f.disco;
+            var addr = client.connection.socket.address();
+            var i; if ((i = disco.features.indexOf("ipv6")) === -1) {
+                if (addr.family == "IPv6") disco.addFeature("ipv6");
+            } else if (addr.family == "IPv4")
+                disco.features.splice(i, 1);
+        });
         var onvcard = function (hash, err, stanza, vcard) { var chat = this;
             if (err) return console.error("vcard fetch errored:", err, ""+stanza);
+            var isclient = client.jid.equals((new xmpp.JID(stanza.attrs.from)));
             var vcardxml = stanza.getChild("vCard").clone();
             delete vcardxml.attrs.xmlns;
             vcardxml = new xmpp.Element("vcards",
                 {xmlns:"urn:ietf:params:xml:ns:vcard-4.0"})
                 .cnode(vcardxml).up();
             var vcardfile = chat.parent.add("vcard.xml", new fs.File());
+            if (isclient) node.add(vcardfile);
             vcardfile.setMode("r--r--r--");
             vcardfile.content.reset();
             vcardfile.content.write(
@@ -189,8 +215,8 @@ root.mkdir = function (name, mode, callback) {
                         root.children.photos.add(hash, f);
                         chat.parent.add(".avatar", f);
                         f.setMode("r--r--r--");
-                        if (client.jid.bare().equals(
-                            (new xmpp.JID(stanza.attrs.from)).bare())) {
+                        if (isclient) {
+                            client.router.f.vcard.setPhotoHash(hash);
                             node.add(".avatar", f);
                             node.add(name, f);
                         }
@@ -209,6 +235,20 @@ root.mkdir = function (name, mode, callback) {
                 }
             }
         };
+        var onversion = function (from, err, version) { var chat = this;
+            if (err) return console.error(
+                "fetching version from",from,":", err);
+            var isclient = client.jid.equals((new xmpp.JID(from)));
+            Object.keys(version).forEach(function (key) {
+                if (version[key]) {
+                    var f = chat.add(key=="name"?"client":key, new fs.File());
+                    if (isclient) node.add(f);
+                    f.setMode("r--r--r--");
+                    f.content.reset();
+                    f.content.write(version[key]);
+                }
+            });
+        }
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
             node.children.roster.hidden = false;
@@ -221,8 +261,12 @@ root.mkdir = function (name, mode, callback) {
                 show: node.children.show.content.toString('utf8'),
                 from: client.jid,
             });
+            var barejid = client.jid.bare().toString();
+            var chat = getChat(node.children.roster, {attrs:{from:""+client.jid}})
             client.roster_fetched = false;
-            client.router.f.presence.probe(client.jid.bare());
+            client.router.f.presence.probe(barejid);
+            client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
+            client.router.f.version.fetch(""+client.jid,onversion.bind(chat,""+client.jid));
             client.router.f.roster.get(function (items) {
                 items.forEach(function (item) {
                     console.log(item);
@@ -232,6 +276,7 @@ root.mkdir = function (name, mode, callback) {
                                        {attrs:{from:item.jid}});
                     if (isnew) {
                         chat.parent.hidden = true;
+                        client.router.f.presence.probe(item.jid);
                         client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
                     }
                     if (!chat.children.subscription ||
@@ -273,8 +318,6 @@ root.mkdir = function (name, mode, callback) {
                             }
                         });
                     }
-                    if (!client.router.f.disco.cache[item.jid])
-                        client.router.f.presence.probe(item.jid);
                     chat.children.subscription.setState(item.subscription);
                 });
                 client.roster_fetched = true;
@@ -293,6 +336,8 @@ root.mkdir = function (name, mode, callback) {
             process.emit('connection closed');
         });
         client.router.match("self::message", function (stanza) {
+            if (stanza.attrs.type === "error")
+                console.error("message", stanza.toString());
             var chat = getChat(node.children.roster, stanza);
             var message = stanza.getChildText('body');
             if (message) {
@@ -304,6 +349,8 @@ root.mkdir = function (name, mode, callback) {
             }
         });
         client.router.on('presence', function (stanza) {
+            if (stanza.attrs.type === "error")
+                console.error("presence", stanza.toString());
             var chat = getChat(node.children.roster, stanza);
             chat.parent.hidden = !!stanza.attrs.type;
             if (chat.children.state) {
@@ -336,21 +383,11 @@ root.mkdir = function (name, mode, callback) {
                         f.content.reset();
                         f.content.write(info.features.join("\n"));
                     }
-                    client.router.f.version.fetch(stanza.attrs.from, function (err, version) {
-                        if (err) return console.error(
-                            "fetching version from",stanza.attrs.from,":", err);
-                        Object.keys(version).forEach(function (key) {
-                            if (version[key]) {
-                                var f = chat.add(key=="name"?"client":key, new fs.File());
-                                f.setMode("r--r--r--");
-                                f.content.reset();
-                                f.content.write(version[key]);
-                            }
-                        });
-                    });
+                    client.router.f.version.fetch(stanza.attrs.from,
+                        onversion.bind(chat, stanza.attrs.from));
                 });
             }
-            chat.children.presence.content.write(stanza.toString() + "\n");
+            chat.children["presence.xml"].content.write(stanza.toString() + "\n");
             ;["show","status","priority"].forEach(function (name) { var text;
                 if ((text = stanza.getChildText(name))) {
                     if (!chat.children[name])
@@ -362,10 +399,11 @@ root.mkdir = function (name, mode, callback) {
         });
         client.router.f.vcard.on('update', function (stanza, match) {
             var chat = getChat(node.children.roster, stanza);
+            if (!client.roster_fetched) return;
             match = match.filter(function (m) {return typeof(m)!=='string'});
             if(!match.length) return;
-            var hash;if(client.roster_fetched&&(hash=match[0].getChildText("photo")))
-                client.router.f.vcard.get(stanza.attrs.from, onvcard.bind(chat,hash));
+            client.router.f.vcard.get(stanza.attrs.from,
+                onvcard.bind(chat, match[0].getChildText("photo")));
         });
         client.router.match("self::iq", function (stanza) {
             if (stanza.attrs.type === "error")
