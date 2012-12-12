@@ -71,11 +71,14 @@ Directory.prototype.add = function (name, child) {
     if (!child && name) child = this.children[name];
     if (!child) return console.error("no child!");
     if (!name) return console.error("no name!");
-    this.children[name] = child;
+    if (!this.children[name] || this.children[name].constructor !== child.constructor)
+        this.children[name] = child;
+    else if (this.children[name])
+        (child = this.children[name]).protected = true;
     if (!child.parent) child.parent = this;
     if (!child.name) child.name = name;
     return child;
-}
+};
 
 Directory.prototype.open = function (flags, callback) {
     callback(E.OK);
@@ -240,7 +243,7 @@ Chat.prototype.truncate = function () {
 };
 
 Chat.prototype.write = function (offset, len, buf, fd, callback) {
-    if (!this.root.client) return callback(fs.E.OK);
+    if (!this.root.client) return callback(E.OK);
     this.emit('message', this.writeOut(buf, offset).message);
     callback(len);
 };
