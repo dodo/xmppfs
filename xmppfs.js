@@ -262,6 +262,15 @@ root.mkdir = function (name, mode, callback) {
                 client.router.f.vcard.get(stanza.attrs.from,
                                           function (err, stanza, vcard) {
                     if (err) return console.error("fetch errored:", err);
+                    var vcardxml = new xmpp.Element(
+                        "vcards", {xmlns:"urn:ietf:params:xml:ns:vcard-4.0"}
+                    ).cnode(stanza.getChild("vCard").clone()).up();
+                    var vcardfile = chat.add("vcard.xml", new fs.File());
+                    vcardfile.setMode("r--r--r--");
+                    vcardfile.content.reset();
+                    vcardfile.content.write(
+                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                        +   vcardxml.toString());
                     for (var text, i = 0; i < vcard.length ; i++) {
                         if (vcard[i].name === "PHOTO" &&
                            (text = vcard[i].getChildText("BINVAL"))) {
