@@ -150,9 +150,11 @@ root.mkdir = function (name, mode, callback) {
         client.on('stanza', client.router.onstanza);
         var onvcard = function (hash, err, stanza, vcard) { var chat = this;
             if (err) return console.error("fetch errored:", err);
-            var vcardxml = new xmpp.Element(
-                "vcards", {xmlns:"urn:ietf:params:xml:ns:vcard-4.0"}
-            ).cnode(stanza.getChild("vCard").clone()).up();
+            var vcardxml = stanza.getChild("vCard").clone();
+            delete vcardxml.attrs.xmlns;
+            vcardxml = new xmpp.Element("vcards",
+                {xmlns:"urn:ietf:params:xml:ns:vcard-4.0"})
+                .cnode(vcardxml).up();
             var vcardfile = chat.parent.add("vcard.xml", new fs.File());
             vcardfile.setMode("r--r--r--");
             vcardfile.content.reset();
