@@ -152,14 +152,13 @@ root.mkdir = function (name, mode, callback) {
         process.on('close connection', onclose);
         connections++;
         client.router.f = {};
-        client.router.f.disco    = new Disco( client.router);
+        client.router.f.disco    = new Disco( client.router, {});
         client.router.f.vcard    = new VCard( client.router);
         client.router.f.presence = new Presence(client.router);
         client.router.f.roster   = new Roster(client.router, client.router.f.disco);
         client.router.f.ping     = new Ping(  client.router, client.router.f.disco);
         client.router.f.version  = new Version(client.router,
             extend({disco:client.router.f.disco}, VERSION));
-        client.router.f.version.on('error', console.error.bind(console,"version fetch errored:"));
         client.router.f.roster.on('error', console.error.bind(console,"roster fetch errored:"));
         client.on('stanza', client.router.onstanza);
         var onvcard = function (hash, err, stanza, vcard) { var chat = this;
@@ -279,6 +278,7 @@ root.mkdir = function (name, mode, callback) {
             });
         });
         client.on('close', function () {
+            client.router.f.disco.clearCache();
             node.children.roster.hidden = true;
             node.children.state.setState("offline");
             node.children.resource.setMode("rw-rw-rw-");

@@ -1,5 +1,3 @@
-var EventEmitter = require('events').EventEmitter;
-var inherits = require('inherits');
 var xmpp = require('node-xmpp');
 var util = require('./util');
 
@@ -8,9 +6,7 @@ var NS = {
 };
 
 exports.Version = Version;
-inherits(Version, EventEmitter);
 function Version(router, options) {
-    Version.super.call(this);
     this.identity = {};
     options = this.set(options);
     this.router = router;
@@ -18,8 +14,9 @@ function Version(router, options) {
                  {version:NS.version},
                  this.get_version.bind(this));
     if (options.disco) {
-        options.disco.addIdentity(this.identity);
-        options.disco.addFeature(NS.version);
+        this.disco = options.disco;
+        this.disco.addIdentity(this.identity);
+        this.disco.addFeature(NS.version);
     }
 };
 Version.NS = NS;
@@ -38,6 +35,11 @@ proto.set = function (options) {
 proto.fetch = function (to, callback) {
     var id = util.id("version");
     var from = this.router.connection.jid;
+    if (this.disco && this.disco.cache && this.disco.cache[to]) {
+        var info = this.disco.cache[to];
+        if (info.features.indexOf(NS.version) === -1)
+            return callback("doesnt support " + NS.version + " :(");
+    }
     var xpath = "self::iq[@type=result and @id='"+id+"']/version:query/child::*";
     this.router.request(xpath,{version:NS.version},this.on_version.bind(this,callback));
     this.router.send(new xmpp.Iq({from:from,to:to,id:id,type:'get'})
@@ -45,7 +47,7 @@ proto.fetch = function (to, callback) {
 };
 
 proto.on_version = function (callback, err, stanza, items) {
-    if (err) return this.emit('error', err, stanza, items);
+    if (err) return callback(err);
     var res = {}; items.forEach(function (item) {
         switch(item.name) {
             case "version":
@@ -56,11 +58,10 @@ proto.on_version = function (callback, err, stanza, items) {
             default:break; // skip
         }
     });
-    callback(res);
+    callback(null, res);
 };
 
 proto.get_version = function (stanza, match) {
-    this.emit('request', stanza, match);
     this.router.emit('version', stanza, match);
     var query = new xmpp.Iq({
         to:stanza.attrs.from,
