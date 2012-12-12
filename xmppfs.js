@@ -368,6 +368,8 @@ root.mkdir = function (name, mode, callback) {
                 client.router.f.vcard.get(stanza.attrs.from, onvcard.bind(chat,hash));
         });
         client.router.match("self::iq", function (stanza) {
+            if (stanza.attrs.type === "error")
+                console.error("iq", stanza.toString());
             node.children['iqs.xml'].content.write(stanza.toString() + "\n");
         });
 
