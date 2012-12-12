@@ -89,6 +89,10 @@ Directory.prototype.read = function (offset, len, buf, fd, callback) {
     callback(-E.EISDIR);
 };
 
+Directory.prototype.write = function (offset, len, buf, fd, callback) {
+    callback(-E.EISDIR);
+};
+
 Directory.prototype.mkdir = function (name, mode, callback) {
     if (!this.children[name]) {
         this.add(name, new Directory()).protected = false;
