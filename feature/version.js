@@ -1,3 +1,5 @@
+var EventEmitter = require('events').EventEmitter;
+var inherits = require('inherits');
 var xmpp = require('node-xmpp');
 var util = require('./util');
 
@@ -6,14 +8,16 @@ var NS = {
 };
 
 exports.Version = Version;
+inherits(Version, EventEmitter);
 function Version(router, options) {
+    Version.super.call(this);
     this.identity = {};
-    this.set(options);
+    options = this.set(options);
     this.router = router;
     router.match("self::iq[@type=get]/version:query",
                  {version:NS.version},
                  this.get_version.bind(this));
-    if (options && options.disco) {
+    if (options.disco) {
         options.disco.addIdentity(this.identity);
         options.disco.addFeature(NS.version);
     }
@@ -28,19 +32,35 @@ proto.set = function (options) {
     this.version = options.version || "";
     id.type = options.type;
     this.os = options.os;
-
+    return options;
 };
 
-proto.version = function (to, callback) {
+proto.fetch = function (to, callback) {
     var id = util.id("version");
     var from = this.router.connection.jid;
     var xpath = "self::iq[@type=result and @id='"+id+"']/version:query/child::*";
-    this.router.request(xpath, {version:NS.version}, callback);
+    this.router.request(xpath,{version:NS.version},this.on_version.bind(this,callback));
     this.router.send(new xmpp.Iq({from:from,to:to,id:id,type:'get'})
         .c("query", {xmlns:NS.version}).up());
 };
 
+proto.on_version = function (callback, err, stanza, items) {
+    if (err) return this.emit('error', err, stanza, items);
+    var res = {}; items.forEach(function (item) {
+        switch(item.name) {
+            case "version":
+            case "name":
+            case "os":
+                res[item.name] = item.getText();
+                break;
+            default:break; // skip
+        }
+    });
+    callback(res);
+};
+
 proto.get_version = function (stanza, match) {
+    this.emit('request', stanza, match);
     this.router.emit('version', stanza, match);
     var query = new xmpp.Iq({
         to:stanza.attrs.from,

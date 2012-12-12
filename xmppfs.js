@@ -159,7 +159,8 @@ root.mkdir = function (name, mode, callback) {
         client.router.f.ping     = new Ping(  client.router, client.router.f.disco);
         client.router.f.version  = new Version(client.router,
             extend({disco:client.router.f.disco}, VERSION));
-        client.router.f.roster.on('error', console.error.bind(console,"fetch errored:"));
+        client.router.f.version.on('error', console.error.bind(console,"version fetch errored:"));
+        client.router.f.roster.on('error', console.error.bind(console,"roster fetch errored:"));
         client.on('stanza', client.router.onstanza);
         var onvcard = function (hash, err, stanza, vcard) { var chat = this;
             if (err) return console.error("vcard fetch errored:", err, ""+stanza);
@@ -336,8 +337,19 @@ root.mkdir = function (name, mode, callback) {
                 chat.children.state.setState(
                     chat.parent.hidden ? "offline" : "online");
             }
-            if (!chat.parent.hidden)
+            if (!chat.parent.hidden) {
                 client.router.f.disco.info(stanza.attrs.from, oninfo.bind(chat));
+                client.router.f.version.fetch(stanza.attrs.from, function (version) {
+                    Object.keys(version).forEach(function (key) {
+                        if (version[key]) {
+                            var f = chat.add(key=="name"?"client":key, new fs.File());
+                            f.setMode("r--r--r--");
+                            f.content.reset();
+                            f.content.write(version[key]);
+                        }
+                    });
+                });
+            }
             chat.children.presence.content.write(stanza.toString() + "\n");
             ;["show","status","priority"].forEach(function (name) { var text;
                 if ((text = stanza.getChildText(name))) {
