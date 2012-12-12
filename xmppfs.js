@@ -221,6 +221,7 @@ root.mkdir = function (name, mode, callback) {
                 show: node.children.show.content.toString('utf8'),
                 from: client.jid,
             });
+            client.roster_fetched = false;
             client.router.f.presence.probe(client.jid.bare());
             client.router.f.roster.get(function (items) {
                 items.forEach(function (item) {
@@ -272,9 +273,11 @@ root.mkdir = function (name, mode, callback) {
                             }
                         });
                     }
-                    client.router.f.presence.probe(item.jid);
+                    if (!client.router.f.disco.cache[item.jid])
+                        client.router.f.presence.probe(item.jid);
                     chat.children.subscription.setState(item.subscription);
                 });
+                client.roster_fetched = true;
             });
         });
         client.on('close', function () {
@@ -307,45 +310,43 @@ root.mkdir = function (name, mode, callback) {
                 chat.children.state.setState(
                     chat.parent.hidden ? "offline" : "online");
             }
-            if (!chat.parent.hidden) {
-                client.router.f.disco.info(stanza.attrs.from,
-                                           function (err, stanza, match) {
-                    if (err) return; // no info? bad luck i guess
-                    var child; if (!(child = stanza.getChild("query"))) return;
-                    child.getChildren("identity").forEach(function (c) {
-                        if (c.attrs.category == "client") {
-                            console.log(chat.parent.name+"/"+chat.name, c.attrs)
-                            if (c.attrs.name) {
+            if (client.roster_fetched && !chat.parent.hidden) {
+                client.router.f.disco.info(stanza.attrs.from, function (err, info) {
+                    if (err) info = {identities:[],features:[]}; // no info? bad luck i guess
+                    info.identities.forEach(function (c) {
+                        if (c.category == "client") {
+                            console.log(chat.parent.name+"/"+chat.name, c)
+                            if (c.name) {
                                 var f = chat.add("client", new fs.File());
                                 f.setMode("r--r--r--");
                                 f.content.reset();
-                                f.content.write(c.attrs.name);
+                                f.content.write(c.name);
                             }
-                            if (c.attrs.type) {
+                            if (c.type) {
                                 var f = chat.add("device", new fs.File());
                                 f.setMode("r--r--r--");
                                 f.content.reset();
-                                f.content.write(c.attrs.type);
+                                f.content.write(c.type);
                             }
                         }
                     });
-                    var features; if ((features = child.getChildren("feature"))) {
+                    if (info.features.length) {
                         var f = chat.add("features", new fs.File());
                         f.setMode("r--r--r--");
                         f.content.reset();
-                        f.content.write(features.map(function (feature) {
-                            return feature.attrs.var;
-                        }).join("\n"));
+                        f.content.write(info.features.join("\n"));
                     }
-                });
-                client.router.f.version.fetch(stanza.attrs.from, function (version) {
-                    Object.keys(version).forEach(function (key) {
-                        if (version[key]) {
-                            var f = chat.add(key=="name"?"client":key, new fs.File());
-                            f.setMode("r--r--r--");
-                            f.content.reset();
-                            f.content.write(version[key]);
-                        }
+                    client.router.f.version.fetch(stanza.attrs.from, function (err, version) {
+                        if (err) return console.error(
+                            "fetching version from",stanza.attrs.from,":", err);
+                        Object.keys(version).forEach(function (key) {
+                            if (version[key]) {
+                                var f = chat.add(key=="name"?"client":key, new fs.File());
+                                f.setMode("r--r--r--");
+                                f.content.reset();
+                                f.content.write(version[key]);
+                            }
+                        });
                     });
                 });
             }
@@ -363,8 +364,8 @@ root.mkdir = function (name, mode, callback) {
             var chat = getChat(node.children.roster, stanza);
             match = match.filter(function (m) {return typeof(m)!=='string'});
             if(!match.length) return;
-            var hash = match[0].getChildText("photo");
-            client.router.f.vcard.get(stanza.attrs.from, onvcard.bind(chat,hash));
+            var hash;if(client.roster_fetched&&(hash=match[0].getChildText("photo")))
+                client.router.f.vcard.get(stanza.attrs.from, onvcard.bind(chat,hash));
         });
         client.router.match("self::iq", function (stanza) {
             node.children['iqs.xml'].content.write(stanza.toString() + "\n");
