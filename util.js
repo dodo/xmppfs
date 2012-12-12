@@ -1,3 +1,5 @@
+var crypto = require('crypto');
+
 var moment = require('moment');
 moment.lang('en');
 moment.calendar = {
@@ -17,3 +19,9 @@ exports.formatDate = function (date) {
 exports.escapeResource = function (resource) {
     return ("" + resource).replace("/", "_");
 };
+
+exports.sha1 = function (data) {
+    var hash = crypto.createHash('sha1');
+    hash.update(data);
+    return hash.digest('hex');
+}

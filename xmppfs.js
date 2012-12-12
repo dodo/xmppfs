@@ -160,7 +160,7 @@ root.mkdir = function (name, mode, callback) {
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 +   vcardxml.toString());
             for (var text, i = 0; i < vcard.length ; i++) {
-                if (hash && vcard[i].name === "PHOTO" &&
+                if (vcard[i].name === "PHOTO" &&
                     (text = vcard[i].getChildText("BINVAL"))) {
                     var blob = new Buffer(text, 'base64');
                     var ext = "";
@@ -168,6 +168,7 @@ root.mkdir = function (name, mode, callback) {
                         ext = ext.replace("image/",".");
                     else ext = "";
                     var name = "avatar" + ext;
+                    hash = hash || util.sha1(blob);
                     if (!chat.parent.children[name]) {
                         var f = chat.parent.add(name, new fs.File(blob));
                         root.children.photos.add(hash, f);
