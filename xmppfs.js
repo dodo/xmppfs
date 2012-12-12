@@ -148,7 +148,51 @@ root.mkdir = function (name, mode, callback) {
         client.router.f.roster   = new Roster(client.router, client.router.f.disco);
         client.router.f.ping     = new Ping(  client.router, client.router.f.disco);
         client.on('stanza', client.router.onstanza);
+        var onvcard = function (hash, err, stanza, vcard) { var chat = this;
+            if (err) return console.error("fetch errored:", err);
+            var vcardxml = new xmpp.Element(
+                "vcards", {xmlns:"urn:ietf:params:xml:ns:vcard-4.0"}
+            ).cnode(stanza.getChild("vCard").clone()).up();
+            var vcardfile = chat.add("vcard.xml", new fs.File());
+            vcardfile.setMode("r--r--r--");
+            vcardfile.content.reset();
+            vcardfile.content.write(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                +   vcardxml.toString());
+            for (var text, i = 0; i < vcard.length ; i++) {
+                if (hash && vcard[i].name === "PHOTO" &&
+                    (text = vcard[i].getChildText("BINVAL"))) {
+                    var blob = new Buffer(text, 'base64');
+                    var ext = "";
+                    if ((ext = vcard[i].getChildText("TYPE")))
+                        ext = ext.replace("image/",".");
+                    else ext = "";
+                    var name = "avatar" + ext;
+                    if (!chat.parent.children[name]) {
+                        var f = chat.parent.add(name, new fs.File(blob));
+                        root.children.photos.add(hash, f);
+                        chat.parent.add(".avatar", f);
+                        f.setMode("r--r--r--");
+                        if (client.jid.bare().equals(
+                            (new xmpp.JID(stanza.attrs.from)).bare())) {
+                            node.add(".avatar", f);
+                            node.add(name, f);
+                        }
+                    }
+                    chat.parent.children[".avatar"].content.reset();
+                    chat.parent.children[".avatar"].content.write(blob);
 
+                    chat.parent.children[".directory"].setOptions({
+                        Icon:Path.join(options.mount, "photos", hash),
+                    });
+                } else if (vcard[i].name === "NICKNAME" &&
+                            (text = vcard[i].getText())) {
+                    chat.parent.children[".directory"].setOptions({
+                        Comment:text,
+                    });
+                }
+            }
+        }
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
             node.children.roster.hidden = false;
@@ -177,6 +221,7 @@ root.mkdir = function (name, mode, callback) {
                             ["none", "from", "to", "both"],
                             item.attrs.subscription));
                         client.router.f.presence.probe(barejid);
+                        client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
                         f.on('state', function (state, dir) {
                             if (dir === 'out') return;
                             var oldstate = this.content;
@@ -254,58 +299,12 @@ root.mkdir = function (name, mode, callback) {
                 }
             });
         });
-        client.router.f.vcard.on('update', function (stanza, match) { var hash;
+        client.router.f.vcard.on('update', function (stanza, match) {
             var chat = getChat(node.children.roster, stanza);
             match = match.filter(function (m) {return typeof(m)!=='string'});
             if(!match.length) return;
-            if ((hash = match[0].getChildText("photo"))) {
-                client.router.f.vcard.get(stanza.attrs.from,
-                                          function (err, stanza, vcard) {
-                    if (err) return console.error("fetch errored:", err);
-                    var vcardxml = new xmpp.Element(
-                        "vcards", {xmlns:"urn:ietf:params:xml:ns:vcard-4.0"}
-                    ).cnode(stanza.getChild("vCard").clone()).up();
-                    var vcardfile = chat.add("vcard.xml", new fs.File());
-                    vcardfile.setMode("r--r--r--");
-                    vcardfile.content.reset();
-                    vcardfile.content.write(
-                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                        +   vcardxml.toString());
-                    for (var text, i = 0; i < vcard.length ; i++) {
-                        if (vcard[i].name === "PHOTO" &&
-                           (text = vcard[i].getChildText("BINVAL"))) {
-                            var blob = new Buffer(text, 'base64');
-                            var ext = "";
-                            if ((ext = vcard[i].getChildText("TYPE")))
-                                ext = ext.replace("image/",".");
-                            else ext = "";
-                            var name = "avatar" + ext;
-                            if (!chat.parent.children[name]) {
-                                var f = chat.parent.add(name, new fs.File(blob));
-                                root.children.photos.add(hash, f);
-                                chat.parent.add(".avatar", f);
-                                f.setMode("r--r--r--");
-                                if (client.jid.bare().equals(
-                                    (new xmpp.JID(stanza.attrs.from)).bare())) {
-                                    node.add(".avatar", f);
-                                    node.add(name, f);
-                                }
-                            }
-                            chat.parent.children[".avatar"].content.reset();
-                            chat.parent.children[".avatar"].content.write(blob);
-
-                            chat.parent.children[".directory"].setOptions({
-                                Icon:Path.join(options.mount, "photos", hash),
-                            });
-                        } else if (vcard[i].name === "NICKNAME" &&
-                                  (text = vcard[i].getText())) {
-                            chat.parent.children[".directory"].setOptions({
-                                Comment:text,
-                            });
-                        }
-                    }
-                });
-            }
+            var hash = match[0].getChildText("photo");
+            client.router.f.vcard.get(stanza.attrs.from, onvcard.bind(chat,hash));
         });
         client.router.match("self::iq", function (stanza) {
             node.children.iqs.content.write(stanza.toString() + "\n");
