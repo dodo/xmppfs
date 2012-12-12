@@ -147,9 +147,10 @@ root.mkdir = function (name, mode, callback) {
         client.router.f.presence = new Presence(client.router);
         client.router.f.roster   = new Roster(client.router, client.router.f.disco);
         client.router.f.ping     = new Ping(  client.router, client.router.f.disco);
+        client.router.f.roster.on('error', console.error.bind(console,"fetch errored:"));
         client.on('stanza', client.router.onstanza);
         var onvcard = function (hash, err, stanza, vcard) { var chat = this;
-            if (err) return console.error("fetch errored:", err);
+            if (err) return console.error("vcard fetch errored:", err, ""+stanza);
             var vcardxml = stanza.getChild("vCard").clone();
             delete vcardxml.attrs.xmlns;
             vcardxml = new xmpp.Element("vcards",
@@ -238,24 +239,23 @@ root.mkdir = function (name, mode, callback) {
                 from: client.jid,
             });
             client.router.f.presence.probe(client.jid.bare());
-            client.router.f.roster.get(function (err, stanza, items) {
-                if (err) return console.error("roster:",err);
+            client.router.f.roster.get(function (items) {
                 items.forEach(function (item) {
-                    console.log(item.attrs);
-                    var barejid = (new xmpp.JID(item.attrs.jid)).bare().toString();
+                    console.log(item);
+                    var barejid = (new xmpp.JID(item.jid)).bare().toString();
                     var isnew = !node.children.roster.children[barejid];
                     var chat = getChat(node.children.roster,
-                                       {attrs:{from:item.attrs.jid}});
+                                       {attrs:{from:item.jid}});
                     if (isnew) {
                         chat.parent.hidden = true;
                         client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
-                        client.router.f.disco.info(item.attrs.from, oninfo.bind(chat));
+                        client.router.f.disco.info(item.jid, oninfo.bind(chat));
                     }
                     if (!chat.children.subscription ||
                          chat.children.subscription.constructor == fs.File) {
                         var f = chat.add("subscription", new fs.State(
                             ["none", "from", "to", "both"],
-                            item.attrs.subscription));
+                            item.subscription));
                         f.on('state', function (state, dir) {
                             if (dir === 'out') return;
                             var oldstate = this.content;
@@ -290,8 +290,8 @@ root.mkdir = function (name, mode, callback) {
                             }
                         });
                     }
-                    client.router.f.presence.probe(item.attrs.jid);
-                    chat.children.subscription.setState(item.attrs.subscription);
+                    client.router.f.presence.probe(item.jid);
+                    chat.children.subscription.setState(item.subscription);
                 });
             });
         });
