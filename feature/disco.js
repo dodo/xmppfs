@@ -7,7 +7,7 @@ var NS = {
     'disco#items': "http://jabber.org/protocol/disco#items",
 };
 
-var identities = [{category: 'client', type: 'xmppfs'}];
+var identities = [{category: 'client', name: 'xmppfs', type:'filesystem'}];
 
 var features = [NS['disco#info']];
 
@@ -41,7 +41,7 @@ proto.info = function (to, callback) {
     var id = util.id("info");
     var xpath = "self::iq[@type=result and @id='" + id + "']/info:query";
     this.router.request(xpath, {info:NS['disco#info']}, callback);
-    this.router.send(new xmpp.Iq({to:to,id:id})
+    this.router.send(new xmpp.Iq({to:to,id:id,type:'get'})
         .c("query", {xmlns:NS['disco#info']}).up());
 };
 
