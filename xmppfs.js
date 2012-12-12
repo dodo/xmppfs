@@ -195,7 +195,27 @@ root.mkdir = function (name, mode, callback) {
                     });
                 }
             }
-        }
+        };
+        var oninfo = function (err, stanza, match) { var chat = this;
+            if (err) return; // no info? bad luck i guess
+            var child = stanza.getChild("query");
+            if (child) child = child.getChildren("identity").forEach(function (c) {
+                if (c.attrs.category == "client") {
+                    if (c.attrs.name) {
+                        var f = chat.add("client", new fs.File());
+                        f.setMode("r--r--r--");
+                        f.content.reset();
+                        f.content.write(c.attrs.name);
+                    }
+                    if (c.attrs.type) {
+                        var f = chat.add("device", new fs.File());
+                        f.setMode("r--r--r--");
+                        f.content.reset();
+                        f.content.write(c.attrs.type);
+                    }
+                }
+            });
+        };
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
             node.children.roster.hidden = false;
@@ -217,14 +237,16 @@ root.mkdir = function (name, mode, callback) {
                     var isnew = !node.children.roster.children[barejid];
                     var chat = getChat(node.children.roster,
                                        {attrs:{from:item.attrs.jid}});
-                    if (isnew) chat.parent.hidden = true;
-                    client.router.f.presence.probe(item.attrs.jid);
+                    if (isnew) {
+                        chat.parent.hidden = true;
+                        client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
+                        client.router.f.disco.info(item.attrs.from, oninfo.bind(chat));
+                    }
                     if (!chat.children.subscription ||
                          chat.children.subscription.constructor == fs.File) {
                         var f = chat.add("subscription", new fs.State(
                             ["none", "from", "to", "both"],
                             item.attrs.subscription));
-                        client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
                         f.on('state', function (state, dir) {
                             if (dir === 'out') return;
                             var oldstate = this.content;
@@ -259,6 +281,7 @@ root.mkdir = function (name, mode, callback) {
                             }
                         });
                     }
+                    client.router.f.presence.probe(item.attrs.jid);
                     chat.children.subscription.setState(item.attrs.subscription);
                 });
             });
@@ -292,6 +315,8 @@ root.mkdir = function (name, mode, callback) {
                 chat.children.state.setState(
                     chat.parent.hidden ? "offline" : "online");
             }
+            if (!chat.parent.hidden)
+                client.router.f.disco.info(stanza.attrs.from, oninfo.bind(chat));
             chat.children.presence.content.write(stanza.toString() + "\n");
             ;["show","status","priority"].forEach(function (name) { var text;
                 if ((text = stanza.getChildText(name))) {
