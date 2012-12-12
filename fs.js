@@ -10,7 +10,8 @@ var util = require('./util');
 var __slice = [].slice;
 
 
-var E = exports.E = {OK:0,EPERM:1,ENOENT:2,EACCES:13,EEXIST:17,ENOTDIR:20,EISDIR:21,EKEYREJECTED:129};
+var E = exports.E = {OK:0,EPERM:1,ENOENT:2,EACCES:13,EEXIST:17,ENOTDIR:20,
+                     EISDIR:21,ENOTEMPTY:39,EKEYREJECTED:129};
 
 
 exports.convertOpenFlags = convertOpenFlags;
@@ -98,6 +99,20 @@ Directory.prototype.mkdir = function (name, mode, callback) {
         this.add(name, new Directory()).protected = false;
         callback(E.OK);
     } else callback(this.children[name].prefix==="d"?(-E.EISDIR):(-E.EEXIST));
+};
+
+Directory.prototype.rmdir = function (name, callback) {
+    if (this.children[name] && this.children[name].prefix !== "d")
+        return callback(-E.ENOTDIR);
+    if (this.children[name] && this.children[name].children.length)
+        return callback(-E.ENOTEMPTY);
+    if (this.children[name] && !this.children[name].protected) {
+        if (this.children[name].parent === this)
+            this.children[name].parent = null;
+        delete this.children[name];
+        this.stats.ctime = new Date();
+        callback(E.OK);
+    } else callback(this.children[name] ? (-E.EACCES) : (-E.ENOENT));
 };
 
 Directory.prototype.create = function  (name, mode, callback) {
@@ -379,18 +394,17 @@ function createRouter(root, options) {
     };
 
     pass.call(-E.ENOTDIR, "readdir");
-    pass.call(-E.EPERM  , "unlink");
-
-    var passthrough = ["getattr","open","read","write","truncate","readlink","rename","rmdir"];
+    var passthrough = ["getattr","open","read","write","truncate","readlink"];
     passthrough.map(pass.bind(-E.ENOENT));
     var passsuccess = ["poll","flush","release"];
     passsuccess.map(pass.bind(E.OK));
-    var passpath = ["create","mkdir"];
+    var passpath = ["create","mkdir","rmdir","unlink","rename"];
     passpath.map(function (method) {
+        var code = method === "rmdir" ? (-E.ENOTDIR) : (-E.ENOENT);
         handlers[method] = function (path) {
             var args = __slice.call(arguments, 1);
             args.unshift(Path.basename(path));
-            delegate(method, Path.dirname(path), args, -E.ENOENT);
+            delegate(method, Path.dirname(path), args, code);
         };
     });
 
