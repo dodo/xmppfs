@@ -10,7 +10,7 @@ var util = require('./util');
 var __slice = [].slice;
 
 
-var E = exports.E = {OK:0,EPERM:1,ENOENT:2,ENOTDIR:20,EISDIR:21,EKEYREJECTED:129};
+var E = exports.E = {OK:0,EPERM:1,ENOENT:2,EACCES:13,EEXIST:17,ENOTDIR:20,EISDIR:21,EKEYREJECTED:129};
 
 
 exports.convertOpenFlags = convertOpenFlags;
@@ -37,6 +37,7 @@ function Node() {
     var now = new Date();
     this.name = this.name || "";
     this.hidden = false;
+    this.protected = true;
     this.stats = {
         uid:process.getuid(),
         gid:process.getgid(),
@@ -82,6 +83,31 @@ Directory.prototype.open = function (flags, callback) {
 
 Directory.prototype.read = function (offset, len, buf, fd, callback) {
     callback(-E.EISDIR);
+};
+
+Directory.prototype.mkdir = function (name, mode, callback) {
+    if (!this.children[name]) {
+        this.add(name, new Directory()).protected = false;
+        callback(E.OK);
+    } else callback(this.children[name].prefix==="d"?(-E.EISDIR):(-E.EEXIST));
+};
+
+Directory.prototype.create = function  (name, mode, callback) {
+    if (!this.children[name]) {
+        this.add(name, new File()).protected = false;
+        callback(E.OK);
+    } else callback(this.children[name].prefix==="d"?(-E.EISDIR):(-E.EEXIST));
+};
+
+Directory.prototype.unlink = function (name, callback) {
+    if (this.children[name] && this.children[name].prefix === "d")
+        return callback(-E.EISDIR);
+    if (this.children[name] && !this.children[name].protected) {
+        if (this.children[name].parent === this)
+            this.children[name].parent = null;
+        delete this.children[name];
+        callback(E.OK);
+    } else callback(this.children[name] ? (-E.EACCES) : (-E.ENOENT));
 };
 
 Directory.prototype.getattr = function (callback) {
