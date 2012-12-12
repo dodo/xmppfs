@@ -1,15 +1,25 @@
 var Path = require('path');
+var extend = require('extend');
 var xmpp = require('node-xmpp');
 var f4js = require('fuse4js');
 
 var fs = require('./fs');
 var util = require('./util');
 var Presence = require('./feature/presence').Presence;
+var Version = require('./feature/version').Version;
 var Router = require('./feature/router').Router;
 var Roster = require('./feature/roster').Roster;
 var Disco = require('./feature/disco').Disco;
 var VCard = require('./feature/vcard').VCard;
 var Ping = require('./feature/ping').Ping;
+
+var VERSION = {
+    type:"filesystem",
+    category:"client",
+    version:"alpha",
+    name:"xmppfs",
+    os:"unix",
+};
 
 var options = {
     mount:"/tmp/mnt/user@domain",
@@ -147,6 +157,8 @@ root.mkdir = function (name, mode, callback) {
         client.router.f.presence = new Presence(client.router);
         client.router.f.roster   = new Roster(client.router, client.router.f.disco);
         client.router.f.ping     = new Ping(  client.router, client.router.f.disco);
+        client.router.f.version  = new Version(client.router,
+            extend({disco:client.router.f.disco}, VERSION));
         client.router.f.roster.on('error', console.error.bind(console,"fetch errored:"));
         client.on('stanza', client.router.onstanza);
         var onvcard = function (hash, err, stanza, vcard) { var chat = this;

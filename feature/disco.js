@@ -7,7 +7,7 @@ var NS = {
     'disco#items': "http://jabber.org/protocol/disco#items",
 };
 
-var identities = [{category: 'client', name: 'xmppfs', type:'filesystem'}];
+var identities = [];
 
 var features = [NS['disco#info']];
 
