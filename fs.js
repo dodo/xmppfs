@@ -82,8 +82,7 @@ Directory.prototype.add = function (name, child) {
 };
 
 Directory.prototype.open = function (flags, callback) {
-    this.stats.atime = new Date();
-    callback(E.OK);
+    callback(-E.EISDIR);
 };
 
 Directory.prototype.read = function (offset, len, buf, fd, callback) {
