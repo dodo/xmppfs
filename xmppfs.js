@@ -25,24 +25,27 @@ function openChat(node, from) {
         return node.chats[name].openChat(util.escapeResource(from.resource));
     }
     var open = function (resource) {
-        var chat = jid.add(resource, new fs.Directory({
-            messages: new fs.Chat(node),
-            presence: new fs.File(),
-        }));
-        if (resource != "undefined") {
-            chat.add("state", new fs.State(["online", "offline"], "offline"))
-                .setMode("r--r--r--");
-        }
-        chat.children.presence.setMode("r--r--r--");
-        chat.children.messages.on('message', function (message) {
+        var chat = jid.add(resource, new fs.Directory());
+        chat.protected = true;
+        chat.add("presence", new fs.File()).setMode("r--r--r--");
+        chat.add("messages", new fs.Chat(node)).on('message', function (message) {
             var to = new xmpp.JID(name);
             to.setResource(resource == "undefined" ? undefined : resource);
             node.client.send(new xmpp.Message({to:to, type:'chat'})
                 .c('body').t(message));
         });
+        if (resource != "undefined") {
+            chat.add("state", new fs.State(["online", "offline"], "offline"))
+                .setMode("r--r--r--");
+        }
         return chat;
     }
+    var isnew = !node.children[name];
     var jid = node.add(name, new fs.Directory());
+    node.chats[name] = jid;
+    jid.openChat = open;
+    jid.setMode("r-xr-xr-x");
+    jid.protected = true;
     jid.add(new fs.DesktopEntry({
         Version:"1.0",
         Type:"Directory",
@@ -50,15 +53,18 @@ function openChat(node, from) {
         Name:"Contact",
         Comment:name,
         Icon:"user-identity",
-    }));
-    node.chats[name] = jid;
-    jid.openChat = open;
-    jid.setMode("r-xr-xr-x");
+    })).protected = true;
     jid.mkdir = function (resource, mode, callback) {
-        open(resource);
+        this.openChat(resource);
         callback(fs.E.OK);
     };
-    return open(util.escapeResource(from.resource));
+    if (!isnew) Object.keys(jid.children).forEach(function (resource) {
+        if (resource == from.resource) return;
+        if (jid.children[resource].protected) return;
+        if (jid.children[resource].prefix === "d")
+            jid.openChat(resource);
+    });
+    return jid.openChat(util.escapeResource(from.resource));
 }
 
 function getChat(node, stanza) {
@@ -109,6 +115,7 @@ root.mkdir = function (name, mode, callback) {
     };
     node.children.roster.chats = {};
     node.children.roster.hidden = true;
+    node.children.roster.setMode("rwxr-xr-x");
     node.children.roster.add(new fs.DesktopEntry({
         Icon:"x-office-address-book",
     }));
@@ -164,7 +171,8 @@ root.mkdir = function (name, mode, callback) {
                     var chat = getChat(node.children.roster,
                                        {attrs:{from:item.attrs.jid}});
                     if (isnew) chat.parent.hidden = true;
-                    if (!chat.children.subscription) {
+                    if (!chat.children.subscription ||
+                         chat.children.subscription.constructor == fs.File) {
                         var f = chat.add("subscription", new fs.State(
                             ["none", "from", "to", "both"],
                             item.attrs.subscription));
