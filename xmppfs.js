@@ -198,8 +198,8 @@ root.mkdir = function (name, mode, callback) {
         };
         var oninfo = function (err, stanza, match) { var chat = this;
             if (err) return; // no info? bad luck i guess
-            var child = stanza.getChild("query");
-            if (child) child = child.getChildren("identity").forEach(function (c) {
+            var child; if (!(child = stanza.getChild("query"))) return;
+            child.getChildren("identity").forEach(function (c) {
                 if (c.attrs.category == "client") {
                     if (c.attrs.name) {
                         var f = chat.add("client", new fs.File());
@@ -215,6 +215,15 @@ root.mkdir = function (name, mode, callback) {
                     }
                 }
             });
+            var features; if ((features = child.getChildren("feature"))) {
+                var f = chat.add("features", new fs.File());
+                f.setMode("r--r--r--");
+                f.content.reset();
+                f.content.write(features.map(function (feature) {
+                    return feature.attrs.var;
+                }).join("\n"));
+            }
+
         };
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
