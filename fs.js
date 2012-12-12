@@ -50,6 +50,7 @@ function Node() {
 
 Node.prototype.setMode = function (newmode) {
     this.stats.mode = mode(this.prefix + newmode);
+    this.stats.mtime = new Date();
 };
 
 
@@ -81,6 +82,7 @@ Directory.prototype.add = function (name, child) {
 };
 
 Directory.prototype.open = function (flags, callback) {
+    this.stats.atime = new Date();
     callback(E.OK);
 };
 
@@ -98,6 +100,7 @@ Directory.prototype.mkdir = function (name, mode, callback) {
 Directory.prototype.create = function  (name, mode, callback) {
     if (!this.children[name]) {
         this.add(name, new File()).protected = false;
+        this.stats.ctime = new Date();
         callback(E.OK);
     } else callback(this.children[name].prefix==="d"?(-E.EISDIR):(-E.EEXIST));
 };
@@ -109,6 +112,7 @@ Directory.prototype.unlink = function (name, callback) {
         if (this.children[name].parent === this)
             this.children[name].parent = null;
         delete this.children[name];
+        this.stats.ctime = new Date();
         callback(E.OK);
     } else callback(this.children[name] ? (-E.EACCES) : (-E.ENOENT));
 };
@@ -118,6 +122,7 @@ Directory.prototype.getattr = function (callback) {
 };
 
 Directory.prototype.readdir = function (callback) {
+    this.stats.atime = new Date();
     callback(E.OK, Object.keys(this.children).map(function (name) {
         if (this.children[name].hidden) name = "." + name;
         return name;
@@ -136,6 +141,7 @@ function File(content) {
 
 File.prototype.open = function (flags, callback) {
 //     console.log(this.name, convertOpenFlags(flags))
+    this.stats.atime = new Date();
     callback(E.OK);
 };
 
@@ -155,10 +161,12 @@ File.prototype.read = function (offset, len, buf, fd, callback) {
 
 File.prototype.write = function (offset, len, buf, fd, callback) {
     this.content.write(buf.slice(0, len));
+    this.stats.ctime = new Date();
     callback(len);
 };
 
 File.prototype.truncate = function (offset, callback) {
+    this.stats.ctime = new Date();
     this.content.reset();
     callback(E.OK);
 };
@@ -175,12 +183,14 @@ function State(options, defaultvalue) {
 State.prototype.setState = function (state, dir) {
     if (this.content === state) return;
     this.emit('state', state, dir || 'out');
+    this.stats.ctime = new Date();
     this.content = state;
 };
 
 State.prototype.open     = File.prototype.open;
 State.prototype.getattr  = File.prototype.getattr;
 State.prototype.truncate = function (offset, callback) {
+    this.stats.ctime = new Date();
     callback(E.OK); // do not truncate state. never.
 };
 
@@ -216,16 +226,18 @@ DesktopEntry.prototype.toString = function (mode) {
       Object.keys(this.options).map(function (key) {
         return key + "=" + this.options[key];
     }.bind(this))).join("\n") + "\n";
-}
+};
 
 DesktopEntry.prototype.setOptions = function (options) {
+    var newstuff = false;
     Object.keys(options || {}).forEach(function (key) {
         if (options[key] === undefined || options[key] === null)
             delete options[key];
-        else this.options[key] = options[key];
+        else {newstuff = true; this.options[key] = options[key];}
     }.bind(this));
     this.content.reset();
     this.content.write(this.toString('content'));
+    if (newstuff) this.stats.ctime = new Date();
 };
 
 
@@ -266,6 +278,7 @@ Chat.prototype.writeIn = function (message) {
     var entry = {message:message, x:">", time:new Date}
     this.log.push(entry);
     this.updateContent();
+    this.stats.ctime = new Date();
     return entry;
 };
 
@@ -275,6 +288,7 @@ Chat.prototype.writeOut = function (buf, offset) {
         entry.message = buf.toString('base64').replace("\n","");
         this.log.push(entry);
         this.updateContent();
+        this.stats.mtime = new Date();
         return entry;
     }
     var i = 0, n = 0;
@@ -296,6 +310,7 @@ Chat.prototype.writeOut = function (buf, offset) {
     entry.message += rawmessage.toString('utf8');
     this.log.push(entry);
     this.updateContent();
+    this.stats.mtime = new Date();
     return entry;
 };
 
