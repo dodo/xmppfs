@@ -39,15 +39,17 @@ proto.addIdentity = function (/* identities */) {
 
 proto.info = function (to, callback) {
     var id = util.id("info");
+    var from = this.router.connection.jid;
     var xpath = "self::iq[@type=result and @id='" + id + "']/info:query";
     this.router.request(xpath, {info:NS['disco#info']}, callback);
-    this.router.send(new xmpp.Iq({to:to,id:id,type:'get'})
+    this.router.send(new xmpp.Iq({from:from,to:to,id:id,type:'get'})
         .c("query", {xmlns:NS['disco#info']}).up());
 };
 
 proto.get_info = function (stanza, match) {
     this.router.emit('info', stanza, match);
     var query = new xmpp.Iq({
+        from:stanza.attrs.to,
         to:stanza.attrs.from,
         id:stanza.attrs.id,
         type:'result',
