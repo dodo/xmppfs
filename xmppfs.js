@@ -90,7 +90,7 @@ root.mkdir = function (name, mode, callback) {
         status:   new fs.File("dodo is using this for tests"),
         priority: new fs.File("0"),
         show:     new fs.File("chat"),
-        iqs:      new fs.File(),
+        'iqs.xml':new fs.File(),
     }));
     node.chats = {};
     node.jid = jid;
@@ -335,7 +335,7 @@ root.mkdir = function (name, mode, callback) {
             client.router.f.vcard.get(stanza.attrs.from, onvcard.bind(chat,hash));
         });
         client.router.match("self::iq", function (stanza) {
-            node.children.iqs.content.write(stanza.toString() + "\n");
+            node.children['iqs.xml'].content.write(stanza.toString() + "\n");
         });
 
     });
