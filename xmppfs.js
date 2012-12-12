@@ -218,12 +218,12 @@ root.mkdir = function (name, mode, callback) {
                     var chat = getChat(node.children.roster,
                                        {attrs:{from:item.attrs.jid}});
                     if (isnew) chat.parent.hidden = true;
+                    client.router.f.presence.probe(item.attrs.jid);
                     if (!chat.children.subscription ||
                          chat.children.subscription.constructor == fs.File) {
                         var f = chat.add("subscription", new fs.State(
                             ["none", "from", "to", "both"],
                             item.attrs.subscription));
-                        client.router.f.presence.probe(barejid);
                         client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
                         f.on('state', function (state, dir) {
                             if (dir === 'out') return;
