@@ -153,7 +153,7 @@ root.mkdir = function (name, mode, callback) {
             var vcardxml = new xmpp.Element(
                 "vcards", {xmlns:"urn:ietf:params:xml:ns:vcard-4.0"}
             ).cnode(stanza.getChild("vCard").clone()).up();
-            var vcardfile = chat.add("vcard.xml", new fs.File());
+            var vcardfile = chat.parent.add("vcard.xml", new fs.File());
             vcardfile.setMode("r--r--r--");
             vcardfile.content.reset();
             vcardfile.content.write(
