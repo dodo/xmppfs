@@ -210,35 +210,6 @@ root.mkdir = function (name, mode, callback) {
                 }
             }
         };
-        var oninfo = function (err, stanza, match) { var chat = this;
-            if (err) return; // no info? bad luck i guess
-            var child; if (!(child = stanza.getChild("query"))) return;
-            child.getChildren("identity").forEach(function (c) {
-                if (c.attrs.category == "client") {
-                    if (c.attrs.name) {
-                        var f = chat.add("client", new fs.File());
-                        f.setMode("r--r--r--");
-                        f.content.reset();
-                        f.content.write(c.attrs.name);
-                    }
-                    if (c.attrs.type) {
-                        var f = chat.add("device", new fs.File());
-                        f.setMode("r--r--r--");
-                        f.content.reset();
-                        f.content.write(c.attrs.type);
-                    }
-                }
-            });
-            var features; if ((features = child.getChildren("feature"))) {
-                var f = chat.add("features", new fs.File());
-                f.setMode("r--r--r--");
-                f.content.reset();
-                f.content.write(features.map(function (feature) {
-                    return feature.attrs.var;
-                }).join("\n"));
-            }
-
-        };
         client.on('online', function  () {
             console.log("client %s online.", node.jid.toString());
             node.children.roster.hidden = false;
@@ -262,7 +233,6 @@ root.mkdir = function (name, mode, callback) {
                     if (isnew) {
                         chat.parent.hidden = true;
                         client.router.f.vcard.get(barejid, onvcard.bind(chat, null));
-                        client.router.f.disco.info(item.jid, oninfo.bind(chat));
                     }
                     if (!chat.children.subscription ||
                          chat.children.subscription.constructor == fs.File) {
@@ -338,7 +308,36 @@ root.mkdir = function (name, mode, callback) {
                     chat.parent.hidden ? "offline" : "online");
             }
             if (!chat.parent.hidden) {
-                client.router.f.disco.info(stanza.attrs.from, oninfo.bind(chat));
+                client.router.f.disco.info(stanza.attrs.from,
+                                           function (err, stanza, match) {
+                    if (err) return; // no info? bad luck i guess
+                    var child; if (!(child = stanza.getChild("query"))) return;
+                    child.getChildren("identity").forEach(function (c) {
+                        if (c.attrs.category == "client") {
+                            console.log(chat.parent.name+"/"+chat.name, c.attrs)
+                            if (c.attrs.name) {
+                                var f = chat.add("client", new fs.File());
+                                f.setMode("r--r--r--");
+                                f.content.reset();
+                                f.content.write(c.attrs.name);
+                            }
+                            if (c.attrs.type) {
+                                var f = chat.add("device", new fs.File());
+                                f.setMode("r--r--r--");
+                                f.content.reset();
+                                f.content.write(c.attrs.type);
+                            }
+                        }
+                    });
+                    var features; if ((features = child.getChildren("feature"))) {
+                        var f = chat.add("features", new fs.File());
+                        f.setMode("r--r--r--");
+                        f.content.reset();
+                        f.content.write(features.map(function (feature) {
+                            return feature.attrs.var;
+                        }).join("\n"));
+                    }
+                });
                 client.router.f.version.fetch(stanza.attrs.from, function (version) {
                     Object.keys(version).forEach(function (key) {
                         if (version[key]) {
