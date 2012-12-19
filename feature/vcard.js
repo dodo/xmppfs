@@ -38,9 +38,15 @@ proto.setPhotoHash = function (hash) {
 proto.get = function (to, callback) {
     if (!callback) {callback = to; to = undefined;}
     var id = util.id("vcard:get");
-    if (to) to = (new xmpp.JID(to)).bare();
-    this.router.request("self::iq[@id='" + id + "']/vc:vCard/child::*",
-                        {vc:NS.vcard}, callback);
+    if (to && typeof(to) === 'string') to = new xmpp.JID(to);
+    if (to) to = to.bare();
+    this.router.request("self::iq[@id='" + id + "']/vc:vCard/child::* | "+
+                        "self::iq[@id='" + id + "' and @type=error]/error/child::*",
+                        {vc:NS.vcard}, function (err, stanza, match) {
+        if (!err && stanza.attrs.type === "error")
+            err = "error:" + (match[0]&&match[0].name);
+        return callback(err, stanza, match);
+    });
     this.router.send(new xmpp.Iq({to:to,id:id,type:'get',from:this.router.connection.jid})
         .c("vCard", {xmlns:NS.vcard}).up());
 };

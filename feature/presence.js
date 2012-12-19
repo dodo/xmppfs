@@ -20,14 +20,21 @@ proto.send = function (opts) {
         if (opts.payload) presence.t(opts.payload);
     }
     this.router.emit('send presence', presence);
+    console.log("presenceOUT", ""+presence)
     this.router.send(presence);
     return this;
 };
 
+proto.offline = function () {
+    this.send({type:'unavailable', from:this.router.connection.jid});
+};
+
 proto.probe = function (to) {
-    this.send({type:'probe', from:this.router.connection.jid, to:to});
+    this.send({from:this.router.connection.jid, to:to});
+//     this.send({type:'probe', from:this.router.connection.jid, to:to});
 }
 
 proto.presence = function (stanza) {
+    console.log("presenceIN", ""+stanza)
     this.router.emit('presence', stanza);
 };

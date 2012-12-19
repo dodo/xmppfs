@@ -4,10 +4,13 @@ var xmpp = require('node-xmpp');
 var util = require('./util');
 
 var NS = {
+    rosterx:'http://jabber.org/protocol/rosterx',
     roster: 'jabber:iq:roster',
     private:'jabber:iq:private',
     delimiter:'roster:delimiter',
 };
+
+var T = ["unavailable","subscribed","unsubscribed","subscribe","unsubscribe"];
 
 exports.Roster = Roster;
 inherits(Roster, EventEmitter);
@@ -17,9 +20,12 @@ function Roster(router, disco) {
     router.match("self::roster:iq[@type=set]",
                  {roster:NS.roster},
                  this.update_items.bind(this));
-    router.match("self::presence[@type=unavailable or not(@type)]",
+    router.match("self::presence[@type="+T.join(" or @type=")+" or not(@type)]",
                  this.update_presence.bind(this));
-    if (disco) disco.addFeature(NS.roster);
+    router.match("self::message/roster:x/item",
+                 {roster:NS.rosterx},
+                 this.on_message.bind(this));
+    if (disco) disco.addFeature(NS.roster, NS.rosterx);
 };
 Roster.NS = NS;
 var proto = Roster.prototype;
@@ -27,11 +33,16 @@ var proto = Roster.prototype;
 
 proto.get = function (callback) {
     var id = util.id("roster");
-    this.router.request("self::iq[@id='" + id + "']/roster:query/item",
-                        {roster:NS.roster},
+    var id2 = util.id("request:roster");
+    var from = this.router.connection.jid;
+    var xpath = "self::iq[@type=result and @id='" + id
+        + "']/roster:query/descendant-or-self::(self::query | self::item)";
+    this.router.request(xpath, {roster:NS.roster},
                         this.get_roster.bind(this, callback));
     this.router.send(new xmpp.Iq({id:id,type:'get'})
         .c("query", {xmlns:NS.roster}).up());
+//     this.router.send(new xmpp.Message({from:from,to:from.bare(),id:id2})
+//         .c("x", {xmlns:NS.rosterx}));
 
 };
 
@@ -70,20 +81,21 @@ proto.unauthorize = function(jid, message) {
 };
 
 
-proto.get_roster = function (callback, err, stanza, items) {
-    if (err || !items.length) return this.emit('error', err, res);
+proto.get_roster = function (callback, err, stanza, match) {
+    if (err || !match.length) return this.emit('error', err, stanza);
     var needdelimiter = false;
-    items = items.map(function (item) {
+    var items = []; match.forEach(function (item) {
+        if (item.is('query')) return;
         var groups = item.getChildren("group").map(function (group) {
             return group && group.getText ? group.getText() : "";
         });
         needdelimiter = needdelimiter || groups.length;
-        return {
+        items.push({
             subscription:item.attrs.subscription,
             jid:item.attrs.jid,
             ask:item.attrs.ask,
             groups:groups,
-        };
+        });
     });
     if (!needdelimiter) return callback(items);
     this.getDelimiter(function (err, stanza, match) {
@@ -104,6 +116,22 @@ proto.update_items = function (stanza, match) {
 };
 
 proto.update_presence = function (stanza) {
-    console.log("update_presence", stanza.toString());
+//     console.error("update_presence", stanza.toString());
+    console.error("update_presence", stanza.attrs.type);
+    var event;
+    switch(stanza.attrs.type) {
+        case "unavailable":  event = "offline"; break;
+        case "subscribed":   event = "add"; break;
+        case "unsubscribed": event = "remove"; break;
+        case "subscribe": case "unsubscribe":
+            event = stanza.attrs.type; break;
+        case undefined: event = "online"; break;
+        default: break;
+    }
+    if (event) this.emit(event, new xmpp.JID(stanza.attrs.from), stanza);
+};
+
+proto.on_message = function (stanza, items) {
+    console.log("on_message", stanza.toString(), items.toString());
 };
 

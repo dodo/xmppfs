@@ -45,7 +45,7 @@ proto.addIdentity = function (/* identities */) {
 };
 
 proto.info = function (to, callback) {
-    to = new xmpp.JID(to);
+    to = typeof(to) === 'string' ? new xmpp.JID(to) : to;
     if(!to.resource) return; // skip
     var id = util.id("info");
     var from = this.router.connection.jid;

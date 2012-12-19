@@ -52,6 +52,7 @@ function Node() {
 Node.prototype.setMode = function (newmode) {
     this.stats.mode = mode(this.prefix + newmode);
     this.stats.mtime = new Date();
+    return this;
 };
 
 
@@ -60,6 +61,7 @@ inherits(Directory, Node);
 Directory.prototype.prefix = "d";
 function Directory(children) {
     Directory.super.call(this);
+    this.ignore_hidden = false;
     this.children = children || {};
     this.stats.size = 4096;
     Object.keys(this.children).forEach(this.add.bind(this));
@@ -75,10 +77,9 @@ Directory.prototype.add = function (name, child) {
     if (!name) return console.error("no name!");
     if (!this.children[name] || this.children[name].constructor !== child.constructor)
         this.children[name] = child;
-    else if (this.children[name])
-        (child = this.children[name]).protected = true;
     if (!child.parent) child.parent = this;
     if (!child.name) child.name = name;
+    if (child) child.protected = true;
     return child;
 };
 
@@ -141,6 +142,7 @@ Directory.prototype.getattr = function (callback) {
 
 Directory.prototype.readdir = function (callback) {
     this.stats.atime = new Date();
+    if (this.ignore_hidden) return callback(E.OK, Object.keys(this.children));
     callback(E.OK, Object.keys(this.children).map(function (name) {
         if (this.children[name].hidden) name = "." + name;
         return name;
@@ -155,6 +157,13 @@ function File(content) {
     this.content = new BufferStream({size:'flexible'});
     if (content) this.content.write(content);
     this.setMode("rw-rw-rw-");
+}
+
+File.prototype.save = function (content) {
+    this.content.reset();
+    this.content.write(content);
+    this.emit('content', this.content);
+    return this;
 }
 
 File.prototype.open = function (flags, callback) {
@@ -180,6 +189,7 @@ File.prototype.read = function (offset, len, buf, fd, callback) {
 File.prototype.write = function (offset, len, buf, fd, callback) {
     this.content.write(buf.slice(0, len));
     this.stats.ctime = new Date();
+    if (len) this.emit('content', this.content);
     callback(len);
 };
 
@@ -199,10 +209,11 @@ function State(options, defaultvalue) {
     this.setMode("rw-rw-rw-");
 }
 State.prototype.setState = function (state, dir) {
-    if (this.content === state) return;
+    if (this.content === state) return this;
     this.emit('state', state, dir || 'out');
     this.stats.ctime = new Date();
     this.content = state;
+    return this;
 };
 
 State.prototype.open     = File.prototype.open;
@@ -256,14 +267,15 @@ DesktopEntry.prototype.setOptions = function (options) {
     this.content.reset();
     this.content.write(this.toString('content'));
     if (newstuff) this.stats.ctime = new Date();
+    return this;
 };
 
 
 exports.Chat = Chat;
 inherits(Chat, File);
-function Chat(root, content) {
+function Chat(client, content) {
     Chat.super.call(this, content);
-    this.root = root;
+    this.client = client;
     this.log = [];
 }
 
@@ -273,9 +285,15 @@ Chat.prototype.truncate = function () {
 };
 
 Chat.prototype.write = function (offset, len, buf, fd, callback) {
-    if (!this.root.client) return callback(E.OK);
+    if (!this.client.handle) return callback(E.OK);
     this.emit('message', this.writeOut(buf, offset).message);
     callback(len);
+};
+
+Chat.prototype.clear = function () {
+    this.content.reset();
+    this.log = [];
+    return this;
 };
 
 Chat.prototype.out = function (entry) {
@@ -344,32 +362,59 @@ function decodeHidden(children, name) {
     return;
 }
 
+exports.lookup = lookup;
 function lookup(root, path) {
+    var p, routes = this;
     if (path === "/")
-        return root;
+        return {params:{}, node:root, path:path, route:this, ss:"/",name:"-"};
     var parts = path.split('/');
+    var params = {};
     var depth = 0;
     var name = parts[++depth];
     var node = decodeHidden(root.children, name);
+    var contact = node && node.contact;
+    if (routes) routes = routes[(p = util.matchUrl(routes, name)).path];
+    if (routes) params = extend(params, p.params);
+    var ss = "/" + (p&&p.path);
     while(node && (depth + 1 < parts.length)) {
         name = parts[++depth];
-        if (!node.children) return;
-        node = decodeHidden(node.children, name);
+        if (node.contact) contact = node.contact;
+        if (!node.children) return {contact:contact,route:routes,params:params};
+        if (!(node = decodeHidden(node.children, name))) break;
+        if (routes) routes = routes[(p = util.matchUrl(routes, node.name)).path];
+        if (routes) params = extend(params, p.params);
+        ss = ss + "/" + (p&&p.path);
     }
-    return node;
+    return {
+        path:parts.slice(depth-1).join("/")||"/",
+        ss:ss,
+        contact:contact,
+        params:params,
+        route:routes,
+        node:node,
+        name:name,
+    };
 }
 
+exports.scheduler = scheduler;
 function scheduler(event, path, args, err) {
-    var node = lookup(this, path);
+    var x = lookup.call(this.routes, this.root, path);
+    var node = x.node;
 //     console.log("NODE", event, path, node && node.name, args);
-    if (node && node[event])
-         return node[event].apply(node, args);
+    var task = node && node[event];
+    if (task && x.route && x.route['/'])
+{//console.error(x.ss,x.path,event,x.route['/'].name, x.name,!!x.contact)
+         return x.route['/'](event, x, args, err);}
+    else if (task)
+         return task.apply(node, args.concat([x.contact]));
+//     else if (node)
+//          return node.lookup(event, x.path, contact, args, err);
     else return args.pop()(err);
 }
 
 exports.createRouter = createRouter;
-function createRouter(root, options) {
-    var delegate = scheduler.bind(root);
+function createRouter(root, routes, options) {
+    var delegate = scheduler.bind({root:root, routes:routes});
     function pass(method) {
         var code = 0 + this;
         return handlers[method] = function (path) {
