@@ -84,8 +84,8 @@ proto.unauthorize = function(jid, message) {
 proto.get_roster = function (callback, err, stanza, match) {
     if (err || !match.length) return this.emit('error', err, stanza);
     var needdelimiter = false;
+    if (match[0].is('query')) return;
     var items = []; match.forEach(function (item) {
-        if (item.is('query')) return;
         var groups = item.getChildren("group").map(function (group) {
             return group && group.getText ? group.getText() : "";
         });

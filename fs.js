@@ -383,7 +383,7 @@ function lookup(root, path) {
         if (node.contact) contact = node.contact;
         if (!node.children) return {contact:contact,route:routes,params:params};
         if (!(node = decodeHidden(node.children, name))) break;
-        if (routes) routes = routes[(p = util.matchUrl(routes, node.name)).path];
+        if (routes) routes = routes[(p = util.matchUrl(routes, name)).path];
         if (routes) params = extend(params, p.params);
         ss = ss + "/" + (p&&p.path);
     }
@@ -405,7 +405,7 @@ function scheduler(event, path, args, err) {
 //     console.log("NODE", event, path, node && node.name, args);
     var task = node && node[event];
     if (task && x.route && x.route['/'])
-{//console.error(x.ss,x.path,event,x.route['/'].name, x.name,!!x.contact)
+{//console.error(path, "\n",x.ss,x.path,event,x.route['/'].name, x.name,!!x.contact)
          return x.route['/'](event, x, args, err);}
     else if (task)
          return task.apply(node, args.concat([x.contact]));
