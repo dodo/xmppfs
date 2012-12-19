@@ -79,9 +79,10 @@ Directory.prototype.add = function (name, child, action) {
        !this.children[name]    ||
         this.children[name].constructor !== child.constructor)
         this.children[name] = child;
+    child = this.children[name];
     if (!child.parent) child.parent = this;
     if (!child.name) child.name = name;
-    if (child) child.protected = true;
+    child.protected = true;
     return child;
 };
 
