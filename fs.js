@@ -68,14 +68,16 @@ function Directory(children) {
     this.setMode("r--r--r--");
 }
 
-Directory.prototype.add = function (name, child) {
+Directory.prototype.add = function (name, child, action) {
     if (typeof(name) !== 'string') {child = name; name = undefined;}
     if (typeof(child) !== 'object') child = null;
     if (!name && child) name = child.name;
     if (!child && name) child = this.children[name];
     if (!child) return console.error("no child!");
     if (!name) return console.error("no name!");
-    if (!this.children[name] || this.children[name].constructor !== child.constructor)
+    if (action === 'overwrite' ||
+       !this.children[name]    ||
+        this.children[name].constructor !== child.constructor)
         this.children[name] = child;
     if (!child.parent) child.parent = this;
     if (!child.name) child.name = name;
