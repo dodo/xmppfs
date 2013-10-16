@@ -1,7 +1,7 @@
 var Path = require('path');
 var EventEmitter = require('events').EventEmitter;
 var BufferStream = require('bufferstream');
-var inherits = require('inherits');
+var inherits = require('util').inherits;
 var extend = require('extend');
 var trim = require('trim');
 var mode = require('./mode');
@@ -33,7 +33,7 @@ exports.Node = Node;
 inherits(Node, EventEmitter);
 Node.prototype.prefix = "-";
 function Node() {
-    Node.super.call(this);
+    Node.super_.call(this);
     var now = new Date();
     this.name = this.name || "";
     this.hidden = false;
@@ -59,7 +59,7 @@ exports.Directory = Directory;
 inherits(Directory, Node);
 Directory.prototype.prefix = "d";
 function Directory(children) {
-    Directory.super.call(this);
+    Directory.super_.call(this);
     this.ignore_hidden = false;
     this.children = children || {};
     this.stats.size = 4096;
@@ -155,7 +155,7 @@ Directory.prototype.readdir = function (callback) {
 exports.File = File;
 inherits(File, Node);
 function File(content) {
-    File.super.call(this);
+    File.super_.call(this);
     this.content = new BufferStream({size:'flexible'});
     if (content) this.content.write(content);
     this.setMode("rw-rw-rw-");
@@ -205,7 +205,7 @@ File.prototype.truncate = function (offset, callback) {
 exports.State = State;
 inherits(State, Node);
 function State(options, defaultvalue) {
-    State.super.call(this);
+    State.super_.call(this);
     this.options = options || [];
     this.content = defaultvalue || this.options[0];
     this.setMode("rw-rw-rw-");
@@ -247,12 +247,12 @@ inherits(DesktopEntry, File);
 function DesktopEntry(options) {
     this.name = ".directory";
     this.options = options || {};
-    DesktopEntry.super.call(this, this.toString('content'));
+    DesktopEntry.super_.call(this, this.toString('content'));
 }
 
 DesktopEntry.prototype.toString = function (mode) {
     if (mode !== 'content')
-        return DesktopEntry.super.toString.apply(this, __slice.call(arguments));
+        return DesktopEntry.super_.toString.apply(this, __slice.call(arguments));
     return ["[Desktop Entry]"].concat(
       Object.keys(this.options).map(function (key) {
         return key + "=" + this.options[key];
@@ -276,14 +276,14 @@ DesktopEntry.prototype.setOptions = function (options) {
 exports.Chat = Chat;
 inherits(Chat, File);
 function Chat(client, content) {
-    Chat.super.call(this, content);
+    Chat.super_.call(this, content);
     this.client = client;
     this.log = [];
 }
 
 Chat.prototype.truncate = function () {
     this.updateContent();
-    return Chat.super.prototype.truncate.apply(this, __slice.call(arguments));
+    return Chat.super_.prototype.truncate.apply(this, __slice.call(arguments));
 };
 
 Chat.prototype.write = function (offset, len, buf, fd, callback) {
