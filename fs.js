@@ -2,7 +2,6 @@ var Path = require('path');
 var EventEmitter = require('events').EventEmitter;
 var BufferStream = require('bufferstream');
 var inherits = require('inherits');
-var xmpp = require('node-xmpp');
 var extend = require('extend');
 var trim = require('trim');
 var mode = require('./mode');

@@ -1,18 +1,11 @@
 var Path = require('path');
 var extend = require('extend');
 var moment = require('moment');
-var xmpp = require('node-xmpp');
+var JID = require('node-xmpp').JID;
 var f4js = require('fuse4js');
 
 var fs = require('./fs');
 var util = require('./util');
-var Presence = require('./feature/presence').Presence;
-var Version = require('./feature/version').Version;
-var Router = require('./feature/router').Router;
-var Roster = require('./feature/roster').Roster;
-var Disco = require('./feature/disco').Disco;
-var VCard = require('./feature/vcard').VCard;
-var Ping = require('./feature/ping').Ping;
 var model = require('./lib/model');
 var view = require('./lib/view');
 
@@ -37,7 +30,7 @@ var connections = 0;
 var root = new fs.Directory({photos:new fs.Directory()});
 root.children.photos.hidden = true;
 root.mkdir = function (name, mode, callback) {
-    var jid = new xmpp.JID(name);
+    var jid = new JID(name);
     var barejid = jid.bare().toString();
     fs.Directory.prototype.mkdir.call(root, barejid, mode, function (err) {
         if (err === fs.E.OK && !accounts[barejid]) {
@@ -82,7 +75,7 @@ function unmount(callback) {
 
 function main() {
     if (process.argv.length < 3) {
-        console.log("Usage: %s mount jid", Path.basename(process.argv[1]));
+        console.log("Usage: %s mount", Path.basename(process.argv[1]));
         return process.exit(-1);
     }
     if (process.argv.length > 2)  options.dir = process.argv[2];
