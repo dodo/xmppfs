@@ -10,7 +10,7 @@
       "trim": "*",
       "moment": "*",
       "extend": "*",
-      "inherits": "*",
+      "lightstream": "*",
       "bufferstream": "*",
       "ltx-xpath":"*",
       "node-xmpp":"*",
