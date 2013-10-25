@@ -88,7 +88,7 @@ Directory.prototype.merge = function (dir) {
 };
 
 Directory.prototype.add = function (name, child, action) {
-    if (typeof(name) !== 'string') {child = name; name = undefined;}
+    if (typeof(name) !== 'string') {action = child; child = name; name = null;}
     if (typeof(child) !== 'object') child = null;
     if (!name && child) name = child.name;
     if (!child && name) child = this.children[name];
@@ -146,21 +146,24 @@ Directory.prototype.create = function  (name, mode, callback) {
     } else callback(this.children[name].prefix==="d"?(-E.EISDIR):(-E.EEXIST));
 };
 
-Directory.prototype.rename = function (from, to, callback) {
-    if (this.children[from] && !this.children[from].protected) {
-        if (this.children[to]) {
-            if (!this.children[to].merge(this.children[from]))
+Directory.prototype.rename = function (name, child, callback) {
+    if (this.children[name] && !this.children[name].protected) {
+        if (child.parent === this) {
+            if (!child.merge(this.children[name]))
                 return callback(-E.EBADE);
-            if (this.children[from].parent === this)
-                this.children[from].parent = null;
-            delete this.children[from];
+            if (this.children[name].parent === this)
+                this.children[name].parent = null;
+            delete this.children[name];
         } else {
-            this.children[to] = this.children[from];
-            this.children[to].name = to;
+            if (this.children[name].parent === this)
+                this.children[name].parent = null;
+            this.children[name].name = child.name;
+            child.parent.add(this.children[name], 'overwrite');
+            delete this.children[name];
         }
         this.stats.ctime = new Date();
         callback(E.OK);
-    } else callback(this.children[from] ? (-E.EACCES) : (-E.ENOENT));
+    } else callback(this.children[name] ? (-E.EACCES) : (-E.ENOENT));
 };
 
 Directory.prototype.unlink = function (name, callback) {
@@ -516,7 +519,7 @@ function createRouter(root, routes, options) {
             args.unshift(Path.basename(path));
             if (method === "rename") {
                 args[0] = Path.basename(args[0]);
-                args[1] = Path.basename(args[1]);
+                args[1] = lookup.call(routes, root, args[1]).node;
             }
             delegate(method, Path.dirname(path), args, code);
         };
