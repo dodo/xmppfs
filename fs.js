@@ -58,6 +58,10 @@ Node.prototype.setMode = function (newmode) {
     return this;
 };
 
+Node.prototype.getPath = function () {
+    return (this.parent ? Path.join(this.parent.getPath(), this.name) : this.name || "/");
+};
+
 
 exports.Directory = Directory;
 inherits(Directory, Node);
@@ -101,7 +105,8 @@ Directory.prototype.add = function (name, child, action) {
     child = this.children[name];
     if (!child.parent) child.parent = this;
     if (!child.name) child.name = name;
-    child.protected = true;
+    if (action !== 'unprotected')
+        child.protected = true;
     return child;
 };
 
@@ -148,19 +153,20 @@ Directory.prototype.create = function  (name, mode, callback) {
 
 Directory.prototype.rename = function (name, child, callback) {
     if (this.children[name] && !this.children[name].protected) {
-        if (child.parent === this) {
+        if (child.leastNode) {
+            if (child.leastNode.getPath() !== Path.dirname(child.path))
+                return callback(-E.ENOENT);
+            if (this.children[name].parent === this)
+                this.children[name].parent = null;
+            this.children[name].name = Path.basename(child.path);
+            child.leastNode.add(this.children[name], 'unprotected');
+        } else {
             if (!child.merge(this.children[name]))
                 return callback(-E.EBADE);
             if (this.children[name].parent === this)
                 this.children[name].parent = null;
-            delete this.children[name];
-        } else {
-            if (this.children[name].parent === this)
-                this.children[name].parent = null;
-            this.children[name].name = child.name;
-            child.parent.add(this.children[name], 'overwrite');
-            delete this.children[name];
         }
+        delete this.children[name];
         this.stats.ctime = new Date();
         callback(E.OK);
     } else callback(this.children[name] ? (-E.EACCES) : (-E.ENOENT));
@@ -415,10 +421,12 @@ function decodeHidden(children, name) {
 }
 
 exports.lookup = lookup;
-function lookup(root, path) {
+function lookup(root, path, opts) {
+    opts = opts || {};
+    var leastnode = opts.least ? root : null;
     var p, routes = this;
     if (path === "/")
-        return {params:{}, node:root, path:path, route:this, ss:"/",name:"-"};
+        return {params:{}, leastNode:leastnode, node:root, path:path, route:this, ss:"/",name:"-"};
     var parts = path.split('/');
     var params = {};
     var depth = 0;
@@ -428,6 +436,7 @@ function lookup(root, path) {
     if (routes) routes = routes[(p = util.matchUrl(routes, name)).path];
     if (routes) params = extend(params, p.params);
     var ss = "/" + (p&&p.path);
+    if (opts.least) leastnode = node || leastnode;
     while(node && (depth + 1 < parts.length)) {
         name = parts[++depth];
         if (node.contact) contact = node.contact;
@@ -436,6 +445,7 @@ function lookup(root, path) {
         if (routes) routes = routes[(p = util.matchUrl(routes, name)).path];
         if (routes) params = extend(params, p.params);
         ss = ss + "/" + (p&&p.path);
+        if (opts.least) leastnode = node || leastnode;
     }
     return {
         path:parts.slice(depth-1).join("/")||"/",
@@ -443,6 +453,7 @@ function lookup(root, path) {
         contact:contact,
         params:params,
         route:routes,
+        leastNode:leastnode,
         node:node,
         name:name,
     };
@@ -518,8 +529,9 @@ function createRouter(root, routes, options) {
             var args = __slice.call(arguments, 1);
             args.unshift(Path.basename(path));
             if (method === "rename") {
+                var res = lookup.call(routes, root, args[1], {least:true});
                 args[0] = Path.basename(args[0]);
-                args[1] = lookup.call(routes, root, args[1]).node;
+                args[1] = res.node || {leastNode:res.leastNode, path:args[1]};
             }
             delegate(method, Path.dirname(path), args, code);
         };
