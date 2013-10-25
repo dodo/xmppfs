@@ -10,7 +10,7 @@ var __slice = [].slice;
 
 
 var E = exports.E = {OK:0,EPERM:1,ENOENT:2,EACCES:13,EEXIST:17,ENOTDIR:20,
-                     EISDIR:21,ENOTEMPTY:39,EKEYREJECTED:129};
+                     EISDIR:21,ENOTEMPTY:39,EBADE:52,EKEYREJECTED:129};
 
 
 exports.convertOpenFlags = convertOpenFlags;
@@ -48,6 +48,10 @@ function Node() {
     this.setMode("---------");
 }
 
+Node.prototype.merge = function (node) {
+    return false; // not implemented by default
+};
+
 Node.prototype.setMode = function (newmode) {
     this.stats.mode = mode(this.prefix + newmode);
     this.stats.mtime = new Date();
@@ -66,6 +70,22 @@ function Directory(children) {
     Object.keys(this.children).forEach(this.add.bind(this));
     this.setMode("r--r--r--");
 }
+
+Directory.prototype.merge = function (dir) {
+    if (!dir instanceof Directory) return false;
+    this.name = dir.name;
+    this.stats = dir.stats;
+    this.stats.ctime = new Date();
+    this.stats.mtime = new Date();
+    this.children.forEach(function (child) {
+        if (child.parent === this) child.parent = null;
+    }.bind(this));
+    this.children = dir.children;
+    this.children.forEach(function (child) {
+        if (child.parent === dir) child.parent = this;
+    }.bind(this));
+    return true;
+};
 
 Directory.prototype.add = function (name, child, action) {
     if (typeof(name) !== 'string') {child = name; name = undefined;}
@@ -126,6 +146,23 @@ Directory.prototype.create = function  (name, mode, callback) {
     } else callback(this.children[name].prefix==="d"?(-E.EISDIR):(-E.EEXIST));
 };
 
+Directory.prototype.rename = function (from, to, callback) {
+    if (this.children[from] && !this.children[from].protected) {
+        if (this.children[to]) {
+            if (!this.children[to].merge(this.children[from]))
+                return callback(-E.EBADE);
+            if (this.children[from].parent === this)
+                this.children[from].parent = null;
+            delete this.children[from];
+        } else {
+            this.children[to] = this.children[from];
+            this.children[to].name = to;
+        }
+        this.stats.ctime = new Date();
+        callback(E.OK);
+    } else callback(this.children[from] ? (-E.EACCES) : (-E.ENOENT));
+};
+
 Directory.prototype.unlink = function (name, callback) {
     if (this.children[name] && this.children[name].prefix === "d")
         return callback(-E.EISDIR);
@@ -160,6 +197,16 @@ function File(content) {
     if (content) this.content.write(content);
     this.setMode("rw-rw-rw-");
 }
+
+File.prototype.merge = function (file) {
+    if (! file instanceof File) return false;
+    this.name = file.name;
+    this.stats = file.stats;
+    this.stats.ctime = new Date();
+    this.stats.mtime = new Date();
+    this.save(file.content.buffer);
+    return true;
+};
 
 File.prototype.save = function (content) {
     this.content.reset();
@@ -467,6 +514,10 @@ function createRouter(root, routes, options) {
         handlers[method] = function (path) {
             var args = __slice.call(arguments, 1);
             args.unshift(Path.basename(path));
+            if (method === "rename") {
+                args[0] = Path.basename(args[0]);
+                args[1] = Path.basename(args[1]);
+            }
             delegate(method, Path.dirname(path), args, code);
         };
     });
