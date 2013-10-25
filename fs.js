@@ -26,7 +26,7 @@ function convertOpenFlags(openFlags) {
 }
 
 exports.join = join;
-function join(node) {return node ? (join(node.parent) + "/" + node.name) : ""};
+function join(node) {return node ? Path.join(join(node.parent),node.name) : "/"};
 
 
 exports.Node = Node;
@@ -56,10 +56,6 @@ Node.prototype.setMode = function (newmode) {
     this.stats.mode = mode(this.prefix + newmode);
     this.stats.mtime = new Date();
     return this;
-};
-
-Node.prototype.getPath = function () {
-    return (this.parent ? Path.join(this.parent.getPath(), this.name) : this.name || "/");
 };
 
 
@@ -154,7 +150,7 @@ Directory.prototype.create = function  (name, mode, callback) {
 Directory.prototype.rename = function (name, child, callback) {
     if (this.children[name] && !this.children[name].protected) {
         if (child.leastNode) {
-            if (child.leastNode.getPath() !== Path.dirname(child.path))
+            if (join(child.leastNode) !== Path.dirname(child.path))
                 return callback(-E.ENOENT);
             if (this.children[name].parent === this)
                 this.children[name].parent = null;
